@@ -1,0 +1,110 @@
+#pragma once
+
+#include <array>
+
+#include <juce_audio_processors/juce_audio_processors.h>
+
+#include "DrumTrack.h"
+#include "Parameters.h"
+
+namespace df
+{
+
+/** The instrument: eight independently assignable drum tracks, a GM note map,
+    a shared reverb send and a master bus.
+
+    Audio-thread entry points are `processBlock` and the lock-free `triggerTrack`,
+    which lets the UI audition a pad without ever touching engine state directly.
+*/
+class DrumKitProcessor final : public juce::AudioProcessor
+{
+public:
+    DrumKitProcessor();
+    ~DrumKitProcessor() override = default;
+
+    void prepareToPlay (double sampleRate, int samplesPerBlock) override;
+    void releaseResources() override;
+    void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+
+    juce::AudioProcessorEditor* createEditor() override;
+    bool hasEditor() const override { return true; }
+
+    const juce::String getName() const override { return "DrumForge"; }
+    bool acceptsMidi() const override { return true; }
+    bool producesMidi() const override { return false; }
+    bool isMidiEffect() const override { return false; }
+    double getTailLengthSeconds() const override { return 12.0; }
+
+    int getNumPrograms() override { return 1; }
+    int getCurrentProgram() override { return 0; }
+    void setCurrentProgram (int) override {}
+    const juce::String getProgramName (int) override { return {}; }
+    void changeProgramName (int, const juce::String&) override {}
+
+    void getStateInformation (juce::MemoryBlock& destData) override;
+    void setStateInformation (const void* data, int sizeInBytes) override;
+
+    juce::AudioProcessorValueTreeState apvts;
+
+    //==============================================================================
+    // Used by the editor and by the offline rendering tools.
+
+    /** Queues a hit for the audio thread. Safe to call from the message thread. */
+    void triggerTrack (int trackIndex, float velocity);
+
+    float readTrackPeak (int trackIndex) noexcept;
+    uint32_t getTrackTriggerCount (int trackIndex) const noexcept;
+
+    /** Writes the given engine's own default values into a track's four macro knobs. */
+    void applyModelDefaults (int trackIndex, int modelIndex);
+
+    /** As above, using whichever engine the track currently has selected. */
+    void applyModelDefaults (int trackIndex);
+
+    /** Index of the model currently selected on a track (reads the parameter). */
+    int getSelectedModel (int trackIndex) const noexcept;
+
+    /** Model currently instantiated on a track. Only meaningful while audio runs. */
+    int getActiveModel (int trackIndex) const noexcept;
+
+private:
+    struct PendingTrigger
+    {
+        int track = 0;
+        float velocity = 1.0f;
+    };
+
+    void handleMidiMessage (const juce::MidiMessage& message);
+    void triggerTrackInternal (int trackIndex, float velocity);
+    void applyModelSelection();
+    void renderChunk (int numSamples);
+
+    static void setParameterValue (juce::AudioProcessorValueTreeState& state,
+                                   const juce::String& parameterID,
+                                   float value);
+
+    std::array<DrumTrack, kNumTracks> tracks;
+    std::array<TrackParamRefs, kNumTracks> trackRefs {};
+    GlobalParamRefs globalRefs;
+
+    juce::Reverb reverb;
+    juce::AudioBuffer<float> mixBuffer;
+    juce::AudioBuffer<float> sendBuffer;
+    int preparedBlockSize = 512;
+
+    std::array<ModelParams, kNumTracks> blockParams {};
+    std::array<bool, kNumTracks> blockMuted {};
+    std::array<bool, kNumTracks> blockSoloed {};
+    bool anySolo = false;
+
+    Rng triggerRng { 0x51ed2701u };
+
+    // Single-producer / single-consumer queue for UI-triggered hits.
+    static constexpr int triggerQueueSize = 128;
+    juce::AbstractFifo triggerFifo { triggerQueueSize };
+    std::array<PendingTrigger, (size_t) triggerQueueSize> triggerQueue {};
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DrumKitProcessor)
+};
+
+} // namespace df

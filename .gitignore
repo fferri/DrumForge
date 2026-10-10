@@ -1,0 +1,20 @@
+# Build output
+build/
+build-*/
+cmake-build-*/
+
+# Generated audio from DrumForgeRender
+renders/
+
+# JUCE is fetched separately; see README.md
+JUCE/
+
+# macOS
+.DS_Store
+
+# Editor / IDE
+.vscode/
+.idea/
+*.xcworkspace
+xcuserdata/
+compile_commands.json

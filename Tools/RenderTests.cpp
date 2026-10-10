@@ -1,0 +1,717 @@
+/*
+    DrumForge offline verification.
+
+    Renders the processor without a host and asserts the properties that matter:
+    every engine makes sound, decays to silence, never produces NaN/Inf, stays inside
+    sane level bounds, retriggers without clicking, and honours the GM note map, the
+    hi-hat choke group and full state save/restore.
+
+    Exits non-zero if anything fails.
+*/
+
+#include <algorithm>
+#include <cmath>
+#include <iostream>
+#include <vector>
+
+#include <juce_events/juce_events.h>
+
+#include "Core/DrumKitProcessor.h"
+
+using namespace df;
+
+namespace
+{
+
+constexpr double sampleRate = 48000.0;
+constexpr int blockSize = 256;
+
+int passed = 0;
+int failed = 0;
+
+void check (bool condition, const juce::String& name, const juce::String& detail = {})
+{
+    std::cout << (condition ? "  PASS  " : "  FAIL  ") << name.toStdString();
+
+    if (detail.isNotEmpty())
+        std::cout << "   [" << detail.toStdString() << "]";
+
+    std::cout << "\n";
+
+    condition ? ++passed : ++failed;
+}
+
+void section (const juce::String& title)
+{
+    std::cout << "\n" << title.toStdString() << "\n";
+}
+
+void setParameter (DrumKitProcessor& processor, const juce::String& id, float value)
+{
+    if (auto* parameter = processor.apvts.getParameter (id))
+        parameter->setValueNotifyingHost (parameter->convertTo0to1 (value));
+}
+
+using Event = std::pair<double, juce::MidiMessage>;
+
+juce::AudioBuffer<float> renderEvents (DrumKitProcessor& processor, const std::vector<Event>& events,
+                                       double seconds, double rate = sampleRate)
+{
+    const int totalSamples = (int) std::ceil (seconds * rate);
+
+    juce::AudioBuffer<float> output (2, totalSamples);
+    output.clear();
+
+    juce::AudioBuffer<float> block (2, blockSize);
+    juce::MidiBuffer midi;
+
+    for (int start = 0; start < totalSamples; start += blockSize)
+    {
+        const int numSamples = std::min (blockSize, totalSamples - start);
+        block.setSize (2, numSamples, false, false, true);
+        midi.clear();
+
+        for (const auto& event : events)
+        {
+            const int sample = (int) std::llround (event.first * rate);
+
+            if (sample >= start && sample < start + numSamples)
+                midi.addEvent (event.second, sample - start);
+        }
+
+        processor.processBlock (block, midi);
+
+        for (int channel = 0; channel < 2; ++channel)
+            output.copyFrom (channel, start, block, channel, 0, numSamples);
+    }
+
+    return output;
+}
+
+bool isFinite (const juce::AudioBuffer<float>& buffer)
+{
+    for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
+    {
+        const float* samples = buffer.getReadPointer (channel);
+
+        for (int i = 0; i < buffer.getNumSamples(); ++i)
+            if (! std::isfinite (samples[i]))
+                return false;
+    }
+
+    return true;
+}
+
+float peakBetween (const juce::AudioBuffer<float>& buffer, double fromSeconds, double toSeconds)
+{
+    const int from = juce::jlimit (0, buffer.getNumSamples(), (int) (fromSeconds * sampleRate));
+    const int to = juce::jlimit (from, buffer.getNumSamples(), (int) (toSeconds * sampleRate));
+
+    if (to <= from)
+        return 0.0f;
+
+    return buffer.getMagnitude (from, to - from);
+}
+
+float rmsBetween (const juce::AudioBuffer<float>& buffer, double fromSeconds, double toSeconds)
+{
+    const int from = juce::jlimit (0, buffer.getNumSamples(), (int) (fromSeconds * sampleRate));
+    const int to = juce::jlimit (from, buffer.getNumSamples(), (int) (toSeconds * sampleRate));
+
+    if (to <= from)
+        return 0.0f;
+
+    return buffer.getRMSLevel (0, from, to - from);
+}
+
+float percentile (std::vector<float> values, float fraction)
+{
+    if (values.empty())
+        return 0.0f;
+
+    std::sort (values.begin(), values.end());
+    const auto last = (float) (values.size() - 1);
+    const auto index = (size_t) juce::jlimit (0.0f, last, fraction * last);
+    return values[index];
+}
+
+//==============================================================================
+
+void testNoteMap()
+{
+    section ("GM note map");
+
+    const int expectedNotes[kNumTracks] { 36, 38, 42, 46, 39, 45, 49, 51 };
+
+    for (int t = 0; t < kNumTracks; ++t)
+    {
+        check (primaryNoteForTrack (t) == expectedNotes[t],
+               "track " + juce::String (t + 1) + " primary note",
+               juce::String (primaryNoteForTrack (t)));
+
+        check (trackForMidiNote (expectedNotes[t]) == t,
+               "track " + juce::String (t + 1) + " resolves from its note");
+    }
+
+    check (trackForMidiNote (35) == 0, "note 35 (acoustic bass drum) -> kick");
+    check (trackForMidiNote (40) == 1, "note 40 (electric snare) -> snare");
+    check (trackForMidiNote (44) == 2, "note 44 (pedal hi-hat) -> closed hat");
+    check (trackForMidiNote (47) == 5, "note 47 (low-mid tom) -> membrane");
+    check (trackForMidiNote (57) == 6, "note 57 (crash 2) -> cymbal");
+    check (trackForMidiNote (59) == 7, "note 59 (ride 2) -> ride");
+    check (trackForMidiNote (60) == -1, "note 60 is ignored");
+    check (trackForMidiNote (0) == -1, "note 0 is ignored");
+}
+
+void testSilence()
+{
+    section ("Idle output");
+
+    DrumKitProcessor processor;
+    processor.prepareToPlay (sampleRate, blockSize);
+
+    const auto audio = renderEvents (processor, {}, 1.0);
+
+    check (isFinite (audio), "idle render is finite");
+    check (audio.getMagnitude (0, audio.getNumSamples()) == 0.0f,
+           "idle render is digitally silent",
+           juce::String (audio.getMagnitude (0, audio.getNumSamples())));
+}
+
+void testEveryEngine()
+{
+    section ("Synthesis engines");
+
+    for (int model = 0; model < kNumModels; ++model)
+    {
+        const auto& info = getModelInfo (model);
+        const juce::String name (info.name);
+
+        DrumKitProcessor processor;
+        processor.prepareToPlay (sampleRate, blockSize);
+
+        setParameter (processor, pid::track (0, pid::model), (float) model);
+        processor.applyModelDefaults (0, model);
+        setParameter (processor, pid::reverbMix, 0.0f);
+        setParameter (processor, pid::master, 0.0f);
+
+        std::vector<Event> events;
+        events.emplace_back (0.05, juce::MidiMessage::noteOn (1, primaryNoteForTrack (0), (juce::uint8) 110));
+
+        const auto audio = renderEvents (processor, events, 9.0);
+
+        check (isFinite (audio), name + ": finite output");
+
+        const float peak = audio.getMagnitude (0, audio.getNumSamples());
+        const float peakDb = juce::Decibels::gainToDecibels (peak, -100.0f);
+
+        check (peak > 0.02f, name + ": produces audible output",
+               juce::String (peakDb, 1) + " dBFS");
+
+        check (peak <= 1.0001f, name + ": never exceeds full scale",
+               juce::String (peakDb, 1) + " dBFS");
+
+        // Decay: the engine must be silent well before the end of the render.
+        const float tail = peakBetween (audio, 8.0, 9.0);
+        const float tailDb = juce::Decibels::gainToDecibels (tail, -120.0f);
+
+        check (tail < 1.0e-6f, name + ": decays to silence",
+               juce::String (tailDb, 1) + " dBFS in the last second");
+
+        // The attack must be prompt: percussive engines should not fade in.
+        const float onset = peakBetween (audio, 0.05, 0.08);
+        check (onset > 0.01f, name + ": responds within 30 ms",
+               juce::String (juce::Decibels::gainToDecibels (onset, -100.0f), 1) + " dBFS");
+    }
+}
+
+void testSampleRates()
+{
+    section ("Sample rate independence");
+
+    for (double rate : { 44100.0, 48000.0, 88200.0, 96000.0 })
+    {
+        DrumKitProcessor processor;
+        processor.prepareToPlay (rate, blockSize);
+        setParameter (processor, pid::reverbMix, 0.0f);
+
+        std::vector<Event> events;
+
+        for (int t = 0; t < kNumTracks; ++t)
+            events.emplace_back (0.05, juce::MidiMessage::noteOn (1, primaryNoteForTrack (t), (juce::uint8) 100));
+
+        const auto audio = renderEvents (processor, events, 4.0, rate);
+        const float peak = audio.getMagnitude (0, audio.getNumSamples());
+
+        check (isFinite (audio) && peak > 0.02f && peak <= 1.0001f,
+               juce::String ((int) rate) + " Hz renders correctly",
+               juce::String (juce::Decibels::gainToDecibels (peak, -100.0f), 1) + " dBFS");
+    }
+}
+
+void testRetriggerDeclick()
+{
+    section ("Retrigger de-clicking");
+
+    DrumKitProcessor processor;
+    processor.prepareToPlay (sampleRate, blockSize);
+    setParameter (processor, pid::reverbMix, 0.0f);
+    setParameter (processor, pid::master, 0.0f);
+
+    // A kick with the click removed leaves only low-frequency content, so any sudden
+    // step in the waveform stands out clearly as a click.
+    setParameter (processor, pid::track (0, pid::tone), 0.0f);
+    setParameter (processor, pid::track (0, pid::decay), 0.8f);
+
+    const int note = primaryNoteForTrack (0);
+    constexpr double firstHit = 0.20;
+    constexpr double secondHit = 0.26;
+
+    std::vector<Event> events;
+    events.emplace_back (firstHit, juce::MidiMessage::noteOn (1, note, (juce::uint8) 120));
+    events.emplace_back (secondHit, juce::MidiMessage::noteOn (1, note, (juce::uint8) 120));
+
+    const auto audio = renderEvents (processor, events, 1.5);
+
+    check (isFinite (audio), "retriggered kick is finite");
+
+    const float* samples = audio.getReadPointer (0);
+    const int retriggerSample = (int) (secondHit * sampleRate);
+
+    std::vector<float> neighbourhood;
+
+    for (int i = retriggerSample - 720; i < retriggerSample + 720; ++i)
+        if (i > 0 && i < audio.getNumSamples())
+            neighbourhood.push_back (std::abs (samples[i] - samples[i - 1]));
+
+    const float typical = percentile (neighbourhood, 0.90f);
+    const float atRetrigger = std::abs (samples[retriggerSample] - samples[retriggerSample - 1]);
+
+    // Where is the biggest jump in the whole render, and is it at the retrigger?
+    int worstIndex = 1;
+    float worst = 0.0f;
+
+    for (int i = 1; i < audio.getNumSamples(); ++i)
+    {
+        const float delta = std::abs (samples[i] - samples[i - 1]);
+
+        if (delta > worst)
+        {
+            worst = delta;
+            worstIndex = i;
+        }
+    }
+
+    std::cout << "        retrigger at sample " << retriggerSample
+              << ", largest step anywhere in the render "
+              << juce::String (worst, 5).toStdString() << " at sample " << worstIndex << "\n";
+
+    check (atRetrigger <= 3.0f * typical + 1.0e-4f,
+           "no step discontinuity at the retrigger point",
+           "step " + juce::String (atRetrigger, 5) + " vs p90 " + juce::String (typical, 5));
+}
+
+void testHatChoke()
+{
+    section ("Hi-hat choke group");
+
+    DrumKitProcessor processor;
+    processor.prepareToPlay (sampleRate, blockSize);
+    setParameter (processor, pid::reverbMix, 0.0f);
+
+    const int openHat = primaryNoteForTrack (3);
+    const int closedHat = primaryNoteForTrack (2);
+
+    // Silence the closed hat itself so we only hear the open hat being cut off.
+    setParameter (processor, pid::track (2, pid::level), -60.0f);
+    setParameter (processor, pid::track (3, pid::decay), 0.85f);
+
+    std::vector<Event> events;
+    events.emplace_back (0.05, juce::MidiMessage::noteOn (1, openHat, (juce::uint8) 110));
+
+    const auto control = renderEvents (processor, events, 1.0);
+    const float controlLate = rmsBetween (control, 0.40, 0.50);
+
+    check (controlLate > 1.0e-4f, "open hat is still ringing at 400 ms",
+           juce::String (juce::Decibels::gainToDecibels (controlLate, -100.0f), 1) + " dBFS");
+
+    std::vector<Event> choked = events;
+    choked.emplace_back (0.35, juce::MidiMessage::noteOn (1, closedHat, (juce::uint8) 110));
+
+    const auto audio = renderEvents (processor, choked, 1.0);
+
+    const float before = rmsBetween (audio, 0.30, 0.34);
+    const float after = rmsBetween (audio, 0.38, 0.48);
+
+    check (after < before * 0.02f, "a closed hat cuts the open hat short",
+           "before " + juce::String (juce::Decibels::gainToDecibels (before, -100.0f), 1)
+             + " dB -> after " + juce::String (juce::Decibels::gainToDecibels (after, -100.0f), 1) + " dB");
+
+    check (after < controlLate * 0.05f, "choked tail is far below the unchoked tail",
+           juce::String (juce::Decibels::gainToDecibels (after, -100.0f), 1) + " dB vs "
+             + juce::String (juce::Decibels::gainToDecibels (controlLate, -100.0f), 1) + " dB");
+}
+
+void testFullKitStress()
+{
+    section ("All eight tracks at once");
+
+    DrumKitProcessor processor;
+    processor.prepareToPlay (sampleRate, blockSize);
+
+    std::vector<Event> events;
+
+    // Every track on every sixteenth for four bars, i.e. far more than the kit is
+    // meant to play, to make sure the master limiter holds.
+    for (int step = 0; step < 64; ++step)
+        for (int t = 0; t < kNumTracks; ++t)
+            events.emplace_back (step * 0.0625, juce::MidiMessage::noteOn (1, primaryNoteForTrack (t), (juce::uint8) 127));
+
+    const auto audio = renderEvents (processor, events, 4.5);
+
+    check (isFinite (audio), "dense render is finite");
+
+    const float peak = audio.getMagnitude (0, audio.getNumSamples());
+
+    check (peak <= 1.0001f, "master limiter holds full scale",
+           juce::String (juce::Decibels::gainToDecibels (peak, -100.0f), 1) + " dBFS");
+
+    check (peak > 0.2f, "dense render is not squashed to nothing",
+           juce::String (juce::Decibels::gainToDecibels (peak, -100.0f), 1) + " dBFS");
+}
+
+void testModelSwitching()
+{
+    section ("Live engine switching");
+
+    DrumKitProcessor processor;
+    processor.prepareToPlay (sampleRate, blockSize);
+
+    const int note = primaryNoteForTrack (0);
+
+    std::vector<Event> events;
+
+    for (int step = 0; step < 60; ++step)
+        events.emplace_back (step * 0.05, juce::MidiMessage::noteOn (1, note, (juce::uint8) 110));
+
+    // Change the engine between hits without re-preparing.
+    juce::AudioBuffer<float> block (2, blockSize);
+    juce::MidiBuffer midi;
+
+    const int totalSamples = (int) (3.0 * sampleRate);
+    juce::AudioBuffer<float> output (2, totalSamples);
+    output.clear();
+
+    for (int start = 0; start < totalSamples; start += blockSize)
+    {
+        const int numSamples = std::min (blockSize, totalSamples - start);
+
+        if (start % (blockSize * 12) == 0)
+            setParameter (processor, pid::track (0, pid::model), (float) ((start / (blockSize * 12)) % kNumModels));
+
+        block.setSize (2, numSamples, false, false, true);
+        midi.clear();
+
+        for (const auto& event : events)
+        {
+            const int sample = (int) std::llround (event.first * sampleRate);
+
+            if (sample >= start && sample < start + numSamples)
+                midi.addEvent (event.second, sample - start);
+        }
+
+        processor.processBlock (block, midi);
+
+        for (int channel = 0; channel < 2; ++channel)
+            output.copyFrom (channel, start, block, channel, 0, numSamples);
+    }
+
+    check (isFinite (output), "switching engines mid-performance stays finite");
+    check (output.getMagnitude (0, output.getNumSamples()) > 0.02f, "still producing sound after switches");
+}
+
+void testStateRoundTrip()
+{
+    section ("State save / restore");
+
+    DrumKitProcessor source;
+    source.prepareToPlay (sampleRate, blockSize);
+
+    setParameter (source, pid::track (3, pid::model), (float) ModelId::fmPerc);
+    setParameter (source, pid::track (3, pid::decay), 0.731f);
+    setParameter (source, pid::track (3, pid::tone), 0.129f);
+    setParameter (source, pid::track (5, pid::tune), -7.5f);
+    setParameter (source, pid::master, -11.3f);
+    setParameter (source, pid::reverbMix, 0.66f);
+
+    juce::MemoryBlock state;
+    source.getStateInformation (state);
+
+    check (state.getSize() > 0, "state block is not empty",
+           juce::String ((int) state.getSize()) + " bytes");
+
+    DrumKitProcessor restored;
+    restored.prepareToPlay (sampleRate, blockSize);
+    restored.setStateInformation (state.getData(), (int) state.getSize());
+
+    check (restored.getSelectedModel (3) == (int) ModelId::fmPerc, "model restored on track 4");
+
+    const auto read = [&restored] (const juce::String& id)
+    {
+        return restored.apvts.getRawParameterValue (id)->load();
+    };
+
+    check (std::abs (read (pid::track (3, pid::decay)) - 0.731f) < 1.0e-3f, "decay restored");
+    check (std::abs (read (pid::track (3, pid::tone)) - 0.129f) < 1.0e-3f, "tone restored");
+    check (std::abs (read (pid::track (5, pid::tune)) + 7.5f) < 1.0e-3f, "tune restored");
+    check (std::abs (read (pid::master) + 11.3f) < 1.0e-3f, "master restored",
+           juce::String (read (pid::master), 3));
+    check (std::abs (read (pid::reverbMix) - 0.66f) < 1.0e-3f, "reverb mix restored");
+}
+
+void testUiTriggerAndMetering()
+{
+    section ("Editor trigger path and metering");
+
+    DrumKitProcessor processor;
+    processor.prepareToPlay (sampleRate, blockSize);
+
+    juce::AudioBuffer<float> block (2, blockSize);
+    block.clear();
+    juce::MidiBuffer midi;
+
+    processor.processBlock (block, midi);
+
+    check (processor.getTrackTriggerCount (0) == 0, "trigger counter starts at zero");
+
+    processor.triggerTrack (0, 1.0f);
+    processor.triggerTrack (4, 0.6f);
+    processor.triggerTrack (99, 1.0f);   // out of range: must be ignored
+
+    block.clear();
+    processor.processBlock (block, midi);
+
+    check (processor.getTrackTriggerCount (0) == 1, "queued pad hit fired track 1");
+    check (processor.getTrackTriggerCount (4) == 1, "queued pad hit fired track 5");
+    check (processor.readTrackPeak (0) > 0.001f, "track 1 reported a peak level",
+           juce::String (processor.readTrackPeak (0), 4));
+    check (processor.readTrackPeak (0) == 0.0f, "peak read clears the meter");
+}
+
+void testSoloMute()
+{
+    section ("Mute and solo");
+
+    DrumKitProcessor processor;
+    processor.prepareToPlay (sampleRate, blockSize);
+    setParameter (processor, pid::reverbMix, 0.0f);
+
+    const int kick = primaryNoteForTrack (0);
+    const int snare = primaryNoteForTrack (1);
+
+    std::vector<Event> events;
+    events.emplace_back (0.05, juce::MidiMessage::noteOn (1, kick, (juce::uint8) 110));
+    events.emplace_back (0.05, juce::MidiMessage::noteOn (1, snare, (juce::uint8) 110));
+
+    const auto both = renderEvents (processor, events, 1.0);
+    const float bothRms = rmsBetween (both, 0.05, 0.35);
+
+    // Mute the snare: the kick should remain.
+    DrumKitProcessor muted;
+    muted.prepareToPlay (sampleRate, blockSize);
+    setParameter (muted, pid::reverbMix, 0.0f);
+    setParameter (muted, pid::track (1, pid::mute), 1.0f);
+    const auto mutedAudio = renderEvents (muted, events, 1.0);
+    const float mutedRms = rmsBetween (mutedAudio, 0.05, 0.35);
+
+    check (mutedRms > 0.001f, "muting one track leaves the others audible",
+           juce::String (juce::Decibels::gainToDecibels (mutedRms, -100.0f), 1) + " dBFS");
+    check (mutedRms < bothRms, "muting reduces the total level",
+           juce::String (juce::Decibels::gainToDecibels (mutedRms, -100.0f), 1) + " dB vs "
+             + juce::String (juce::Decibels::gainToDecibels (bothRms, -100.0f), 1) + " dB");
+
+    // Solo the snare: the kick must drop out.
+    DrumKitProcessor soloed;
+    soloed.prepareToPlay (sampleRate, blockSize);
+    setParameter (soloed, pid::reverbMix, 0.0f);
+    setParameter (soloed, pid::track (1, pid::solo), 1.0f);
+    const auto soloAudio = renderEvents (soloed, events, 1.0);
+
+    check (isFinite (soloAudio) && soloAudio.getMagnitude (0, soloAudio.getNumSamples()) > 0.001f,
+           "soloing a track still produces sound");
+}
+
+void testReverbSend()
+{
+    section ("Reverb send bus");
+
+    const int kick = primaryNoteForTrack (0);
+
+    std::vector<Event> events;
+    events.emplace_back (0.05, juce::MidiMessage::noteOn (1, kick, (juce::uint8) 110));
+
+    const auto describe = [] (float value)
+    {
+        return juce::String (juce::Decibels::gainToDecibels (value, -120.0f), 1) + " dBFS";
+    };
+
+    // Dry reference: the kick itself is long gone by 1.5 s.
+    DrumKitProcessor dry;
+    dry.prepareToPlay (sampleRate, blockSize);
+    setParameter (dry, pid::reverbMix, 0.0f);
+    setParameter (dry, pid::track (0, pid::decay), 0.2f);
+    const auto dryAudio = renderEvents (dry, events, 2.5);
+    const float dryTail = peakBetween (dryAudio, 1.5, 2.5);
+
+    check (dryTail < 1.0e-6f, "dry render has no tail after the hit decays", describe (dryTail));
+
+    // Same hit, but sent to the reverb bus at unity.
+    DrumKitProcessor wet;
+    wet.prepareToPlay (sampleRate, blockSize);
+    setParameter (wet, pid::reverbMix, 1.0f);
+    setParameter (wet, pid::reverbSize, 0.9f);
+    setParameter (wet, pid::reverbDamp, 0.25f);
+    setParameter (wet, pid::track (0, pid::decay), 0.2f);
+    setParameter (wet, pid::track (0, pid::send), 1.0f);
+    const auto wetAudio = renderEvents (wet, events, 2.5);
+    const float wetTail = peakBetween (wetAudio, 1.5, 2.5);
+
+    check (isFinite (wetAudio), "reverb render is finite");
+    check (wetTail > 1.0e-4f, "a unity send produces an audible reverb tail", describe (wetTail));
+    check (wetTail < 1.0f, "reverb tail stays inside full scale", describe (wetTail));
+
+    // The send control must actually gate the bus.
+    DrumKitProcessor noSend;
+    noSend.prepareToPlay (sampleRate, blockSize);
+    setParameter (noSend, pid::reverbMix, 1.0f);
+    setParameter (noSend, pid::track (0, pid::decay), 0.2f);
+    setParameter (noSend, pid::track (0, pid::send), 0.0f);
+    const auto noSendAudio = renderEvents (noSend, events, 2.5);
+    const float noSendTail = peakBetween (noSendAudio, 1.5, 2.5);
+
+    check (noSendTail < 1.0e-6f, "zero send produces no reverb tail", describe (noSendTail));
+
+    // The send is post-fader, so it must scale linearly with the fader rather than with
+    // its square. A quadratic send leaves quiet tracks with essentially no reverb, so
+    // compare two renders that differ only in the fader position, with the master fixed.
+    const auto tailForLevel = [&events] (float levelDb)
+    {
+        DrumKitProcessor processor;
+        processor.prepareToPlay (sampleRate, blockSize);
+        setParameter (processor, pid::reverbMix, 1.0f);
+        setParameter (processor, pid::reverbSize, 0.9f);
+        setParameter (processor, pid::reverbDamp, 0.25f);
+        setParameter (processor, pid::master, 0.0f);
+        setParameter (processor, pid::track (0, pid::decay), 0.2f);
+        setParameter (processor, pid::track (0, pid::send), 1.0f);
+        setParameter (processor, pid::track (0, pid::level), levelDb);
+
+        return peakBetween (renderEvents (processor, events, 2.5), 1.5, 2.5);
+    };
+
+    const float loudTail = tailForLevel (0.0f);
+    const float quietTail = tailForLevel (-20.0f);
+    const float ratioDb = juce::Decibels::gainToDecibels (quietTail / loudTail, -120.0f);
+
+    // Linear would be -20 dB; a squared send would land near -40 dB.
+    check (ratioDb > -24.0f,
+           "send follows the fader linearly (post-fader, not fader-squared)",
+           "20 dB fader cut cost the tail " + juce::String (ratioDb, 1) + " dB");
+}
+
+void testHostLifecycle()
+{
+    section ("Host lifecycle: prepare / release cycles");
+
+    DrumKitProcessor processor;
+
+    juce::AudioBuffer<float> buffer (2, 1024);
+    juce::MidiBuffer midi;
+
+    const auto renderHit = [&] (int numSamples, int note)
+    {
+        buffer.setSize (2, numSamples, false, false, true);
+        buffer.clear();
+        midi.clear();
+        midi.addEvent (juce::MidiMessage::noteOn (1, note, (juce::uint8) 110), 0);
+        processor.processBlock (buffer, midi);
+        return buffer.getMagnitude (0, numSamples);
+    };
+
+    const auto audible = [] (float peak) { return std::isfinite (peak) && peak > 0.005f; };
+
+    // Hosts call prepareToPlay more than once - on buffer-size changes, sample-rate
+    // changes and device re-activation - and may call releaseResources in between.
+    // Replacing the engines used to leave the track's active-engine pointer dangling,
+    // so the *second* prepareToPlay dereferenced freed memory and crashed the host.
+    processor.prepareToPlay (48000.0, 512);
+    check (audible (renderHit (512, 36)), "renders after the first prepareToPlay");
+
+    processor.releaseResources();
+    processor.prepareToPlay (48000.0, 256);
+    check (audible (renderHit (256, 38)), "renders after releaseResources + prepareToPlay");
+
+    processor.prepareToPlay (44100.0, 1024);
+    check (audible (renderHit (1024, 42)), "renders after a sample-rate change");
+
+    processor.prepareToPlay (96000.0, 64);
+    check (audible (renderHit (64, 39)), "renders after a block-size change");
+
+    processor.prepareToPlay (48000.0, 128);
+    check (audible (renderHit (128, 46)), "renders after returning to 48 kHz");
+
+    // Re-preparing while a voice is still ringing must not use the freed engine.
+    renderHit (128, 36);
+    processor.prepareToPlay (48000.0, 128);
+    check (audible (renderHit (128, 36)), "re-prepare while a hit is still ringing");
+
+    processor.releaseResources();
+    processor.releaseResources();
+    processor.prepareToPlay (48000.0, 512);
+    check (audible (renderHit (512, 36)), "releaseResources is safe to call twice");
+
+    // Hosts do not always hand over exactly the block size they prepared with - some
+    // pass a larger buffer, so the renderer has to chunk internally.
+    processor.prepareToPlay (48000.0, 64);
+    check (audible (renderHit (2048, 36)), "processes a block larger than the prepared size");
+
+    processor.prepareToPlay (48000.0, 4096);
+    check (audible (renderHit (32, 38)), "processes a block smaller than the prepared size");
+
+    // Changing the engine between prepares must also be safe.
+    setParameter (processor, pid::track (0, pid::model), (float) ModelId::cymbal);
+    renderHit (512, 36);
+    processor.prepareToPlay (48000.0, 512);
+    check (audible (renderHit (512, 36)), "re-prepare after an engine change");
+
+    processor.releaseResources();
+}
+
+} // namespace
+
+int main()
+{
+    juce::ScopedJuceInitialiser_GUI juceInitialiser;
+
+    std::cout << "DrumForge verification suite\n"
+              << "============================\n";
+
+    testNoteMap();
+    testSilence();
+    testEveryEngine();
+    testSampleRates();
+    testRetriggerDeclick();
+    testHatChoke();
+    testFullKitStress();
+    testModelSwitching();
+    testStateRoundTrip();
+    testUiTriggerAndMetering();
+    testSoloMute();
+    testReverbSend();
+    testHostLifecycle();
+
+    std::cout << "\n============================\n"
+              << passed << " passed, " << failed << " failed\n";
+
+    return failed == 0 ? 0 : 1;
+}
