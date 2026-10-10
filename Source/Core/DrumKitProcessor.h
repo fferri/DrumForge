@@ -61,6 +61,12 @@ public:
     /** As above, using whichever engine the track currently has selected. */
     void applyModelDefaults (int trackIndex);
 
+    /** Loads a complete factory kit: engines, distortion modes and every track setting. */
+    void applyKitPreset (int kitIndex);
+
+    /** Index of the kit currently selected (reads the parameter). */
+    int getSelectedKit() const noexcept;
+
     /** Index of the model currently selected on a track (reads the parameter). */
     int getSelectedModel (int trackIndex) const noexcept;
 

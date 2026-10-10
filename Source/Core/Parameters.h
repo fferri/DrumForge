@@ -29,10 +29,12 @@ namespace pid
     constexpr const char* character = "character";
     constexpr const char* sweep     = "sweep";
     constexpr const char* drive     = "drive";
+    constexpr const char* dist      = "dist";
     constexpr const char* send      = "send";
     constexpr const char* mute      = "mute";
     constexpr const char* solo      = "solo";
 
+    constexpr const char* kit          = "kit";
     constexpr const char* master       = "master";
     constexpr const char* reverbSize   = "reverbSize";
     constexpr const char* reverbDamp   = "reverbDamp";
@@ -52,6 +54,7 @@ struct TrackParamRefs
     std::atomic<float>* character = nullptr;
     std::atomic<float>* sweep     = nullptr;
     std::atomic<float>* drive     = nullptr;
+    std::atomic<float>* dist      = nullptr;
     std::atomic<float>* send      = nullptr;
     std::atomic<float>* mute      = nullptr;
     std::atomic<float>* solo      = nullptr;
@@ -59,12 +62,33 @@ struct TrackParamRefs
 
 struct GlobalParamRefs
 {
+    std::atomic<float>* kit         = nullptr;
     std::atomic<float>* master      = nullptr;
     std::atomic<float>* reverbSize  = nullptr;
     std::atomic<float>* reverbDamp  = nullptr;
     std::atomic<float>* reverbMix   = nullptr;
     std::atomic<float>* reverbWidth = nullptr;
 };
+
+/** A complete kit: which engine each track runs, how it is driven and how it is set. */
+struct KitPresetTrack
+{
+    int model;
+    int distMode;
+    float level, pan, tune, decay, tone, character, sweep, drive, send;
+};
+
+struct KitPreset
+{
+    const char* name;
+    KitPresetTrack tracks[kNumTracks];
+};
+
+int numKitPresets() noexcept;
+const KitPreset& kitPreset (int index) noexcept;
+
+/** Index of the kit the plugin boots with, and the source of all factory defaults. */
+int defaultKit() noexcept;
 
 /** Which engine each track ships with, following the GM drum map. */
 int defaultModelForTrack (int trackIndex) noexcept;
@@ -97,6 +121,7 @@ inline void readTrackParams (const TrackParamRefs& refs, ModelParams& out, bool&
     out.sweep     = refs.sweep->load();
     out.drive     = refs.drive->load();
     out.send      = refs.send->load();
+    out.distMode  = (int) std::lround (refs.dist->load());
     muted = refs.mute->load() > 0.5f;
     soloed = refs.solo->load() > 0.5f;
 }

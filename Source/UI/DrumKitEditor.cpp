@@ -8,6 +8,24 @@ DrumKitEditor::DrumKitEditor (DrumKitProcessor& owner)
 {
     setLookAndFeel (&lookAndFeel);
 
+    // ---- Factory kit selector -----------------------------------------------
+    for (int i = 0; i < numKitPresets(); ++i)
+        kitBox.addItem (kitPreset (i).name, i + 1);
+
+    kitBox.setTooltip ("Factory kit. Loads each track's engine, distortion curve,\n"
+                       "tuning and level in one go. Every track stays editable afterwards.");
+    kitBox.onChange = [this]
+    {
+        const int selected = kitBox.getSelectedId() - 1;
+
+        if (selected >= 0 && selected != displayedKit)
+            commitKitSelection (selected);
+    };
+
+    displayedKit = kit().getSelectedKit();
+    kitBox.setSelectedId (displayedKit + 1, juce::dontSendNotification);
+    addAndMakeVisible (kitBox);
+
     for (int t = 0; t < kNumTracks; ++t)
     {
         strips[(size_t) t] = std::make_unique<TrackStrip> (kit(), t);
@@ -40,8 +58,8 @@ DrumKitEditor::DrumKitEditor (DrumKitProcessor& owner)
     }
 
     setResizable (true, true);
-    setResizeLimits (1120, 600, 2400, 1500);
-    setSize (1280, 720);
+    setResizeLimits (1120, 660, 2400, 1500);
+    setSize (1280, 752);
 
     startTimerHz (30);
 }
@@ -70,8 +88,15 @@ void DrumKitEditor::paint (juce::Graphics& g)
 
     g.setColour (theme::textDim);
     g.setFont (theme::font (11.0f));
-    g.drawText ("8-track drum & percussion synthesiser  -  7 engines  -  GM drum map",
+    g.drawText ("8-track drum & percussion synthesiser  -  9 engines",
                 title, juce::Justification::centredLeft, false);
+
+    if (! kitCaptionArea.isEmpty())
+    {
+        g.setColour (theme::textDim);
+        g.setFont (theme::font (9.5f, juce::Font::bold));
+        g.drawText ("KIT", kitCaptionArea, juce::Justification::centredLeft, false);
+    }
 }
 
 void DrumKitEditor::resized()
@@ -79,9 +104,16 @@ void DrumKitEditor::resized()
     auto area = getLocalBounds();
 
     headerArea = area.removeFromTop (headerHeight);
-    titleArea = headerArea.reduced (18, 8).removeFromLeft (330);
 
-    auto knobsArea = headerArea.reduced (10, 4).removeFromRight (juce::jmin (500, headerArea.getWidth() / 2));
+    auto header = headerArea.reduced (10, 4);
+    titleArea = header.removeFromLeft (330).reduced (8, 0);
+
+    auto kitSlot = header.removeFromLeft (juce::jmin (200, header.getWidth() / 3));
+    kitCaptionArea = kitSlot.removeFromTop (kitSlot.getHeight() / 2).reduced (2, 0);
+    kitBox.setBounds (kitSlot.reduced (2, 2));
+
+    auto knobsArea = header.removeFromRight (juce::jmin (500, header.getWidth()));
+
     const int knobCount = 5;
     const int knobWidth = knobsArea.getWidth() / knobCount;
 
@@ -102,8 +134,27 @@ void DrumKitEditor::resized()
                                        stripsArea.getHeight());
 }
 
+void DrumKitEditor::commitKitSelection (int kitIndex)
+{
+    if (auto* parameter = kit().apvts.getParameter (pid::kit))
+        parameter->setValueNotifyingHost (parameter->convertTo0to1 ((float) kitIndex));
+
+    displayedKit = kitIndex;
+    kit().applyKitPreset (kitIndex);
+
+    // The strips notice their new engines and distortion curves on the next tick.
+}
+
 void DrumKitEditor::timerCallback()
 {
+    // Polled rather than driven by an attachment: restoring a session changes the kit
+    // parameter, and that must not re-apply the preset over the restored values.
+    if (const int selected = kit().getSelectedKit(); selected != displayedKit)
+    {
+        displayedKit = selected;
+        kitBox.setSelectedId (selected + 1, juce::dontSendNotification);
+    }
+
     for (auto& strip : strips)
         strip->updateFromProcessor();
 }

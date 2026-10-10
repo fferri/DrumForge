@@ -193,6 +193,7 @@ public:
         float* sendRight = send.getWritePointer (1, startSample);
 
         float peak = 0.0f;
+        const int distortionMode = target.distMode;
 
         for (int i = 0; i < todo; ++i)
         {
@@ -215,11 +216,7 @@ public:
             monoLast = sample;
 
             const float drive = driveSm.getNextValue();
-
-            float x = dcBlocker.process (sample);
-
-            if (drive > 1.0e-4f)
-                x = fastTanh (x * (1.0f + drive * 8.0f)) / (1.0f + drive * 2.2f);
+            const float x = applyDistortion (distortionMode, dcBlocker.process (sample), drive);
 
             const float level = levelSm.getNextValue();
             const float sendAmount = sendSm.getNextValue();
@@ -279,6 +276,7 @@ private:
         smoothedParams.pan        = target.pan;
         smoothedParams.drive      = target.drive;
         smoothedParams.send       = target.send;
+        smoothedParams.distMode   = target.distMode;
     }
 
     void updatePeak (float blockPeak) noexcept

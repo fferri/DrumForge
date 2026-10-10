@@ -4,6 +4,11 @@
     Drives the plugin's audio processor without a host and writes WAV files, so the
     instrument can be auditioned and measured from the command line.
 
+    Produces three groups:
+      oneshot_*   one isolated hit per engine, deliberately clean
+      kit_*       the same four-bar beat played through each factory kit
+      track_*     one bar per track of the default kit
+
     Usage: DrumForgeRender [outputDirectory]
 */
 
@@ -53,6 +58,11 @@ void setParameter (DrumKitProcessor& processor, const juce::String& id, float va
         parameter->setValueNotifyingHost (parameter->convertTo0to1 (value));
 }
 
+juce::String safeName (juce::String name)
+{
+    return name.replaceCharacter (' ', '_');
+}
+
 /** Renders `seconds` of output while feeding in the supplied note events. */
 juce::AudioBuffer<float> renderEvents (DrumKitProcessor& processor,
                                        const std::vector<std::pair<double, juce::MidiMessage>>& events,
@@ -89,7 +99,7 @@ juce::AudioBuffer<float> renderEvents (DrumKitProcessor& processor,
     return output;
 }
 
-/** Renders a single isolated hit, e.g. to audition one engine. */
+/** Renders a single isolated hit, e.g. to audition one engine on its own. */
 juce::AudioBuffer<float> renderOneShot (int modelIndex, int trackIndex, double seconds)
 {
     DrumKitProcessor processor;
@@ -97,6 +107,10 @@ juce::AudioBuffer<float> renderOneShot (int modelIndex, int trackIndex, double s
 
     setParameter (processor, pid::track (trackIndex, pid::model), (float) modelIndex);
     processor.applyModelDefaults (trackIndex, modelIndex);
+
+    // Keep the engine demos clean: unity level, no send, and only a whisper of drive.
+    setParameter (processor, pid::track (trackIndex, pid::dist), (float) DistortionMode::soft);
+    setParameter (processor, pid::track (trackIndex, pid::drive), 0.15f);
     setParameter (processor, pid::track (trackIndex, pid::level), 0.0f);
     setParameter (processor, pid::track (trackIndex, pid::send), 0.0f);
     setParameter (processor, pid::track (trackIndex, pid::pan), 0.0f);
@@ -159,7 +173,7 @@ std::vector<std::pair<double, juce::MidiMessage>> buildDemoPattern()
         if (bar >= 2)
             hit (clap, 12, bar, 0.85f);
 
-        // Tom fill in the last bar
+        // Tom slot fill in the last bar - with the Industrial kit this is the sub drone
         if (bar == 3)
         {
             hit (lowTom, 13, bar, 0.9f);
@@ -209,8 +223,8 @@ int main (int argc, char** argv)
               << "  sample rate : " << sampleRate << " Hz\n"
               << "  output      : " << outputDirectory.getFullPathName().toStdString() << "\n\n";
 
-    // ---- One isolated hit per engine ----------------------------------------
-    std::cout << "Engine one-shots (track 1, 0 dB, no reverb):\n";
+    // ---- One isolated hit per engine, deliberately clean ---------------------
+    std::cout << "Engine one-shots (unity level, Soft drive at 0.15, no reverb):\n";
 
     for (int model = 0; model < kNumModels; ++model)
     {
@@ -218,19 +232,38 @@ int main (int argc, char** argv)
         const auto audio = renderOneShot (model, 0, 4.0);
         const juce::String name (info.name);
         const auto file = outputDirectory.getChildFile ("oneshot_" + juce::String (model + 1) + "_"
-                                                        + name.replaceCharacter (' ', '_') + ".wav");
+                                                        + safeName (name) + ".wav");
 
         writeWav (file, audio, sampleRate);
         reportLevels (name, audio);
     }
 
-    // ---- One bar per track, using the factory kit ---------------------------
-    std::cout << "\nFactory kit, one bar per track:\n";
+    // ---- The same beat through every factory kit ----------------------------
+    std::cout << "\nFactory kits, same four-bar pattern:\n";
+
+    for (int kit = 0; kit < numKitPresets(); ++kit)
+    {
+        const auto& preset = kitPreset (kit);
+        const juce::String name (preset.name);
+
+        DrumKitProcessor processor;
+        processor.prepareToPlay (sampleRate, blockSize);
+        processor.applyKitPreset (kit);
+
+        const auto audio = renderEvents (processor, buildDemoPattern(), 8.4);
+        writeWav (outputDirectory.getChildFile ("kit_" + safeName (name) + ".wav"), audio, sampleRate);
+        reportLevels (name, audio);
+    }
+
+    // ---- One bar per track of the default kit -------------------------------
+    const int defaultKitIndex = defaultKit();
+    std::cout << "\nDefault kit (" << kitPreset (defaultKitIndex).name << "), one bar per track:\n";
 
     for (int track = 0; track < kNumTracks; ++track)
     {
         DrumKitProcessor processor;
         processor.prepareToPlay (sampleRate, blockSize);
+        processor.applyKitPreset (defaultKitIndex);
 
         for (int other = 0; other < kNumTracks; ++other)
             setParameter (processor, pid::track (other, pid::mute), other == track ? 0.0f : 1.0f);
@@ -246,37 +279,15 @@ int main (int argc, char** argv)
             for (int i = 1; i < 8; ++i)
                 events.emplace_back (i * 0.125, juce::MidiMessage::noteOn (1, note, (juce::uint8) 110));
 
-        const auto audio = renderEvents (processor, events, 3.0);
-        const auto name = juce::String (track + 1) + "_" + getModelInfo (processor.getSelectedModel (track)).name;
+        if (track == 5) // the sub drone needs time to develop
+            events.clear(), events.emplace_back (0.0, juce::MidiMessage::noteOn (1, note, (juce::uint8) 110));
 
-        writeWav (outputDirectory.getChildFile ("track_" + name.replaceCharacter (' ', '_') + ".wav"),
-                  audio, sampleRate);
+        const auto audio = renderEvents (processor, events, track == 5 ? 6.0 : 3.0);
+        const auto name = juce::String (track + 1) + "_"
+                            + getModelInfo (processor.getSelectedModel (track)).name;
+
+        writeWav (outputDirectory.getChildFile ("track_" + safeName (name) + ".wav"), audio, sampleRate);
         reportLevels ("track " + name, audio);
-    }
-
-    // ---- Full demo pattern --------------------------------------------------
-    std::cout << "\nDemo pattern:\n";
-
-    {
-        DrumKitProcessor processor;
-        processor.prepareToPlay (sampleRate, blockSize);
-
-        const auto audio = renderEvents (processor, buildDemoPattern(), 8.4);
-        const auto file = outputDirectory.getChildFile ("drumforge_demo.wav");
-
-        if (writeWav (file, audio, sampleRate))
-            std::cout << "  wrote " << file.getFullPathName().toStdString() << "\n";
-
-        reportLevels ("demo (kit default)", audio);
-
-        // Same pattern with the reverb send muted, to make the difference audible.
-        DrumKitProcessor dry;
-        dry.prepareToPlay (sampleRate, blockSize);
-        setParameter (dry, pid::reverbMix, 0.0f);
-
-        const auto dryAudio = renderEvents (dry, buildDemoPattern(), 8.4);
-        writeWav (outputDirectory.getChildFile ("drumforge_demo_dry.wav"), dryAudio, sampleRate);
-        reportLevels ("demo (reverb off) ", dryAudio);
     }
 
     std::cout << "\nDone.\n";

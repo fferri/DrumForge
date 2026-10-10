@@ -5,6 +5,23 @@ namespace df
 
 namespace
 {
+    // Readable aliases so the kit tables below stay legible.
+    constexpr int mKick     = (int) ModelId::kick;
+    constexpr int mSnare    = (int) ModelId::snare;
+    constexpr int mMembrane = (int) ModelId::membrane;
+    constexpr int mMetal    = (int) ModelId::metal;
+    constexpr int mClap     = (int) ModelId::clap;
+    constexpr int mCymbal   = (int) ModelId::cymbal;
+    constexpr int mFmPerc   = (int) ModelId::fmPerc;
+    constexpr int mClang    = (int) ModelId::clang;
+    constexpr int mRumble   = (int) ModelId::rumble;
+
+    constexpr int dSoft  = (int) DistortionMode::soft;
+    constexpr int dHard  = (int) DistortionMode::hard;
+    constexpr int dFold  = (int) DistortionMode::fold;
+    constexpr int dFuzz  = (int) DistortionMode::fuzz;
+    constexpr int dCrush = (int) DistortionMode::crush;
+
     struct NoteMapping
     {
         int primaryNote;
@@ -24,26 +41,62 @@ namespace
         { 51, { 51, 53, 59 } }           // Ride 1, ride bell, ride 2
     };
 
-    /** The kit the plugin boots up with. */
-    struct TrackDefaults
+    //==========================================================================
+    // Factory kits.
+    //
+    // Levels are trimmed so the engines' natural outputs land on a sensible
+    // drum-kit balance rather than all sitting at the same fader position.
+    //==========================================================================
+    const KitPreset kitPresets[]
     {
-        int model;
-        float levelDb, pan, tune, decay, tone, character, sweep, drive, send;
+        // ---- Industrial: the default. Inharmonic tunings, wavefolding and
+        //      bit-crushing, plus the two engines built for aggression. ------
+        {
+            "Industrial",
+            {
+                { mKick,   dFold,   0.0f,  0.00f,  0.0f, 0.72f, 0.50f, 0.50f, 0.70f, 0.55f, 0.06f },
+                { mSnare,  dHard,  -3.0f,  0.00f, -6.0f, 0.50f, 0.60f, 0.72f, 0.50f, 0.50f, 0.20f },
+                { mMetal,  dCrush, -11.0f, 0.12f,  5.0f, 0.14f, 0.70f, 0.90f, 0.30f, 0.45f, 0.05f },
+                { mMetal,  dCrush, -11.0f, 0.16f,  5.0f, 0.60f, 0.66f, 0.90f, 0.25f, 0.40f, 0.18f },
+                { mClap,   dFold,  -7.0f, -0.15f,  0.0f, 0.45f, 0.50f, 0.55f, 0.60f, 0.45f, 0.35f },
+                { mRumble, dFold,  -6.0f, -0.25f,  0.0f, 0.45f, 0.30f, 0.55f, 0.60f, 0.55f, 0.15f },
+                { mClang,  dHard, -12.0f, -0.20f,  0.0f, 0.60f, 0.60f, 0.78f, 0.50f, 0.35f, 0.30f },
+                { mCymbal, dCrush, -13.0f, 0.20f,  0.0f, 0.60f, 0.66f, 0.60f, 0.55f, 0.35f, 0.22f }
+            }
+        },
+
+        // ---- Warehouse: tougher than Studio but still musical. --------------
+        {
+            "Warehouse",
+            {
+                { mKick,     dHard,   0.0f,  0.00f, 0.0f, 0.42f, 0.40f, 0.58f, 0.62f, 0.35f, 0.03f },
+                { mSnare,    dHard,  -3.0f,  0.00f, 0.0f, 0.40f, 0.55f, 0.60f, 0.35f, 0.30f, 0.16f },
+                { mMetal,    dSoft, -10.0f,  0.14f, 0.0f, 0.13f, 0.60f, 0.85f, 0.25f, 0.20f, 0.05f },
+                { mMetal,    dSoft,  -9.0f,  0.18f, 0.0f, 0.58f, 0.58f, 0.85f, 0.18f, 0.20f, 0.15f },
+                { mClap,     dSoft,  -5.0f, -0.12f, 0.0f, 0.42f, 0.45f, 0.45f, 0.55f, 0.25f, 0.30f },
+                { mMembrane, dFuzz,  -5.0f, -0.22f, 3.0f, 0.38f, 0.45f, 0.62f, 0.30f, 0.30f, 0.12f },
+                { mCymbal,   dSoft,  -8.0f, -0.16f, 0.0f, 0.60f, 0.60f, 0.55f, 0.62f, 0.10f, 0.26f },
+                { mFmPerc,   dSoft, -10.0f,  0.22f, 7.0f, 0.30f, 0.60f, 0.35f, 0.35f, 0.20f, 0.18f }
+            }
+        },
+
+        // ---- Studio: the original clean, sample-free kit. ------------------
+        {
+            "Studio",
+            {
+                { mKick,     dSoft,   0.0f,  0.00f, 0.0f, 0.45f, 0.35f, 0.55f, 0.62f, 0.18f, 0.03f },
+                { mSnare,    dSoft,  -2.0f,  0.00f, 0.0f, 0.42f, 0.55f, 0.58f, 0.35f, 0.22f, 0.18f },
+                { mMetal,    dSoft,  -9.0f,  0.14f, 0.0f, 0.13f, 0.60f, 0.85f, 0.25f, 0.10f, 0.05f },
+                { mMetal,    dSoft,  -8.0f,  0.18f, 0.0f, 0.60f, 0.58f, 0.85f, 0.18f, 0.10f, 0.16f },
+                { mClap,     dSoft,  -4.0f, -0.12f, 0.0f, 0.42f, 0.45f, 0.45f, 0.55f, 0.16f, 0.35f },
+                { mMembrane, dSoft,  -4.5f, -0.22f, 3.0f, 0.38f, 0.45f, 0.55f, 0.30f, 0.10f, 0.15f },
+                { mCymbal,   dSoft,  -7.0f, -0.16f, 0.0f, 0.60f, 0.60f, 0.55f, 0.62f, 0.05f, 0.30f },
+                { mCymbal,   dSoft,  -9.0f,  0.22f, 0.0f, 0.66f, 0.68f, 0.28f, 0.30f, 0.05f, 0.22f }
+            }
+        }
     };
 
-    // Levels are trimmed so that the engines' natural outputs land on a sensible
-    // drum-kit balance rather than all sitting at the same nominal fader position.
-    const TrackDefaults trackDefaults[kNumTracks]
-    {
-        { (int) ModelId::kick,      0.0f,  0.00f, 0.0f, 0.45f, 0.35f, 0.55f, 0.62f, 0.18f, 0.03f },
-        { (int) ModelId::snare,    -2.0f,  0.00f, 0.0f, 0.42f, 0.55f, 0.58f, 0.35f, 0.22f, 0.18f },
-        { (int) ModelId::metal,    -9.0f,  0.14f, 0.0f, 0.13f, 0.60f, 0.85f, 0.25f, 0.10f, 0.05f },
-        { (int) ModelId::metal,    -8.0f,  0.18f, 0.0f, 0.60f, 0.58f, 0.85f, 0.18f, 0.10f, 0.16f },
-        { (int) ModelId::clap,     -4.0f, -0.12f, 0.0f, 0.42f, 0.45f, 0.45f, 0.55f, 0.16f, 0.35f },
-        { (int) ModelId::membrane, -4.5f, -0.22f, 3.0f, 0.38f, 0.45f, 0.55f, 0.30f, 0.10f, 0.15f },
-        { (int) ModelId::cymbal,   -7.0f, -0.16f, 0.0f, 0.60f, 0.60f, 0.55f, 0.62f, 0.05f, 0.30f },
-        { (int) ModelId::cymbal,   -9.0f,  0.22f, 0.0f, 0.66f, 0.68f, 0.28f, 0.30f, 0.05f, 0.22f }
-    };
+    constexpr int defaultKitIndex = 0;   // Industrial
 
     juce::StringArray modelNames()
     {
@@ -54,11 +107,46 @@ namespace
 
         return names;
     }
+
+    juce::StringArray distortionNames()
+    {
+        juce::StringArray names;
+
+        for (int i = 0; i < kNumDistortionModes; ++i)
+            names.add (distortionModeName (i));
+
+        return names;
+    }
+
+    juce::StringArray kitNames()
+    {
+        juce::StringArray names;
+
+        for (int i = 0; i < numKitPresets(); ++i)
+            names.add (kitPreset (i).name);
+
+        return names;
+    }
+}
+
+int numKitPresets() noexcept
+{
+    return (int) (sizeof (kitPresets) / sizeof (kitPresets[0]));
+}
+
+const KitPreset& kitPreset (int index) noexcept
+{
+    return kitPresets[std::clamp (index, 0, numKitPresets() - 1)];
+}
+
+int defaultKit() noexcept
+{
+    return defaultKitIndex;
 }
 
 int defaultModelForTrack (int trackIndex) noexcept
 {
-    return trackDefaults[std::clamp (trackIndex, 0, kNumTracks - 1)].model;
+    return kitPreset (defaultKitIndex).tracks[std::clamp (trackIndex, 0, kNumTracks - 1)].model;
 }
 
 int primaryNoteForTrack (int trackIndex) noexcept
@@ -86,75 +174,72 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
 {
     juce::AudioProcessorValueTreeState::ParameterLayout layout;
 
-    const auto names = modelNames();
+    const auto models = modelNames();
+    const auto distortions = distortionNames();
+    const auto& defaults = kitPreset (defaultKitIndex);
     constexpr int versionHint = 1;
 
     for (int t = 0; t < kNumTracks; ++t)
     {
-        const auto& defaults = trackDefaults[t];
-        const auto& info = getModelInfo (defaults.model);
+        const auto& d = defaults.tracks[t];
+        const auto& info = getModelInfo (d.model);
+        const auto trackName = "Track " + juce::String (t + 1) + " ";
 
         const auto id = [t] (const char* name) { return pid::track (t, name); };
 
         layout.add (std::make_unique<juce::AudioParameterChoice> (
-            juce::ParameterID { id (pid::model), versionHint },
-            "Track " + juce::String (t + 1) + " Model", names, defaults.model));
+            juce::ParameterID { id (pid::model), versionHint }, trackName + "Model", models, d.model));
+
+        layout.add (std::make_unique<juce::AudioParameterChoice> (
+            juce::ParameterID { id (pid::dist), versionHint }, trackName + "Distortion", distortions, d.distMode));
 
         layout.add (std::make_unique<juce::AudioParameterFloat> (
-            juce::ParameterID { id (pid::level), versionHint },
-            "Track " + juce::String (t + 1) + " Level",
-            juce::NormalisableRange<float> { -60.0f, 12.0f, 0.1f }, defaults.levelDb,
+            juce::ParameterID { id (pid::level), versionHint }, trackName + "Level",
+            juce::NormalisableRange<float> { -60.0f, 12.0f, 0.1f }, d.level,
             juce::AudioParameterFloatAttributes().withLabel ("dB")));
 
         layout.add (std::make_unique<juce::AudioParameterFloat> (
-            juce::ParameterID { id (pid::pan), versionHint },
-            "Track " + juce::String (t + 1) + " Pan",
-            juce::NormalisableRange<float> { -1.0f, 1.0f, 0.01f }, defaults.pan));
+            juce::ParameterID { id (pid::pan), versionHint }, trackName + "Pan",
+            juce::NormalisableRange<float> { -1.0f, 1.0f, 0.01f }, d.pan));
 
         layout.add (std::make_unique<juce::AudioParameterFloat> (
-            juce::ParameterID { id (pid::tune), versionHint },
-            "Track " + juce::String (t + 1) + " Tune",
-            juce::NormalisableRange<float> { -24.0f, 24.0f, 0.01f }, defaults.tune,
+            juce::ParameterID { id (pid::tune), versionHint }, trackName + "Tune",
+            juce::NormalisableRange<float> { -24.0f, 24.0f, 0.01f }, d.tune,
             juce::AudioParameterFloatAttributes().withLabel ("st")));
 
         layout.add (std::make_unique<juce::AudioParameterFloat> (
-            juce::ParameterID { id (pid::decay), versionHint },
-            "Track " + juce::String (t + 1) + " " + info.decayLabel,
-            juce::NormalisableRange<float> { 0.0f, 1.0f, 0.001f }, defaults.decay));
+            juce::ParameterID { id (pid::decay), versionHint }, trackName + info.decayLabel,
+            juce::NormalisableRange<float> { 0.0f, 1.0f, 0.001f }, d.decay));
 
         layout.add (std::make_unique<juce::AudioParameterFloat> (
-            juce::ParameterID { id (pid::tone), versionHint },
-            "Track " + juce::String (t + 1) + " " + info.toneLabel,
-            juce::NormalisableRange<float> { 0.0f, 1.0f, 0.001f }, defaults.tone));
+            juce::ParameterID { id (pid::tone), versionHint }, trackName + info.toneLabel,
+            juce::NormalisableRange<float> { 0.0f, 1.0f, 0.001f }, d.tone));
 
         layout.add (std::make_unique<juce::AudioParameterFloat> (
-            juce::ParameterID { id (pid::character), versionHint },
-            "Track " + juce::String (t + 1) + " " + info.characterLabel,
-            juce::NormalisableRange<float> { 0.0f, 1.0f, 0.001f }, defaults.character));
+            juce::ParameterID { id (pid::character), versionHint }, trackName + info.characterLabel,
+            juce::NormalisableRange<float> { 0.0f, 1.0f, 0.001f }, d.character));
 
         layout.add (std::make_unique<juce::AudioParameterFloat> (
-            juce::ParameterID { id (pid::sweep), versionHint },
-            "Track " + juce::String (t + 1) + " " + info.sweepLabel,
-            juce::NormalisableRange<float> { 0.0f, 1.0f, 0.001f }, defaults.sweep));
+            juce::ParameterID { id (pid::sweep), versionHint }, trackName + info.sweepLabel,
+            juce::NormalisableRange<float> { 0.0f, 1.0f, 0.001f }, d.sweep));
 
         layout.add (std::make_unique<juce::AudioParameterFloat> (
-            juce::ParameterID { id (pid::drive), versionHint },
-            "Track " + juce::String (t + 1) + " Drive",
-            juce::NormalisableRange<float> { 0.0f, 1.0f, 0.001f }, defaults.drive));
+            juce::ParameterID { id (pid::drive), versionHint }, trackName + "Drive",
+            juce::NormalisableRange<float> { 0.0f, 1.0f, 0.001f }, d.drive));
 
         layout.add (std::make_unique<juce::AudioParameterFloat> (
-            juce::ParameterID { id (pid::send), versionHint },
-            "Track " + juce::String (t + 1) + " Send",
-            juce::NormalisableRange<float> { 0.0f, 1.0f, 0.001f }, defaults.send));
+            juce::ParameterID { id (pid::send), versionHint }, trackName + "Send",
+            juce::NormalisableRange<float> { 0.0f, 1.0f, 0.001f }, d.send));
 
         layout.add (std::make_unique<juce::AudioParameterBool> (
-            juce::ParameterID { id (pid::mute), versionHint },
-            "Track " + juce::String (t + 1) + " Mute", false));
+            juce::ParameterID { id (pid::mute), versionHint }, trackName + "Mute", false));
 
         layout.add (std::make_unique<juce::AudioParameterBool> (
-            juce::ParameterID { id (pid::solo), versionHint },
-            "Track " + juce::String (t + 1) + " Solo", false));
+            juce::ParameterID { id (pid::solo), versionHint }, trackName + "Solo", false));
     }
+
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        juce::ParameterID { pid::kit, versionHint }, "Kit", kitNames(), defaultKitIndex));
 
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         juce::ParameterID { pid::master, versionHint }, "Master",
@@ -199,11 +284,13 @@ void cacheParameterPointers (juce::AudioProcessorValueTreeState& state,
         refs.character = get (pid::character);
         refs.sweep     = get (pid::sweep);
         refs.drive     = get (pid::drive);
+        refs.dist      = get (pid::dist);
         refs.send      = get (pid::send);
         refs.mute      = get (pid::mute);
         refs.solo      = get (pid::solo);
     }
 
+    globalRefs.kit         = state.getRawParameterValue (pid::kit);
     globalRefs.master      = state.getRawParameterValue (pid::master);
     globalRefs.reverbSize  = state.getRawParameterValue (pid::reverbSize);
     globalRefs.reverbDamp  = state.getRawParameterValue (pid::reverbDamp);

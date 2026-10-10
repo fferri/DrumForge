@@ -3,12 +3,14 @@
 #include <algorithm>
 #include <memory>
 
+#include "ClangModel.h"
 #include "ClapModel.h"
 #include "CymbalModel.h"
 #include "FmPercModel.h"
 #include "KickModel.h"
 #include "MembraneModel.h"
 #include "MetalModel.h"
+#include "RumbleModel.h"
 #include "SnareModel.h"
 
 namespace df
@@ -45,7 +47,15 @@ inline const ModelInfo& getModelInfo (int modelIndex) noexcept
 
         { "FM Perc", "Two-operator FM - blocks, cowbells, bells",
           0xff5b8de0, "Decay", "Tone", "Ratio", "Index",
-          0.30f, 0.60f, 0.35f, 0.35f }
+          0.30f, 0.60f, 0.35f, 0.35f },
+
+        { "Clang", "Inharmonic FM ring-modulated - atonal struck metal",
+          0xffb0c4de, "Decay", "Tone", "Clang", "Bend",
+          0.45f, 0.55f, 0.65f, 0.45f },
+
+        { "Rumble", "Detuned sub drone with a filtered noise bed",
+          0xff7a4fd0, "Decay", "Tone", "Grit", "Bend",
+          0.55f, 0.35f, 0.50f, 0.55f }
     };
 
     return info[std::clamp (modelIndex, 0, kNumModels - 1)];
@@ -63,6 +73,8 @@ inline std::unique_ptr<DrumModel> createModel (int modelIndex)
         case ModelId::clap:     return std::make_unique<ClapModel>();
         case ModelId::cymbal:   return std::make_unique<CymbalModel>();
         case ModelId::fmPerc:   return std::make_unique<FmPercModel>();
+        case ModelId::clang:    return std::make_unique<ClangModel>();
+        case ModelId::rumble:   return std::make_unique<RumbleModel>();
         case ModelId::count:    break;
     }
 

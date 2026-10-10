@@ -687,6 +687,191 @@ void testHostLifecycle()
     processor.releaseResources();
 }
 
+void testDistortionModes()
+{
+    section ("Distortion modes");
+
+    const int kick = primaryNoteForTrack (0);
+
+    const auto render = [&] (int mode, float drive)
+    {
+        DrumKitProcessor processor;
+        processor.prepareToPlay (sampleRate, blockSize);
+        setParameter (processor, pid::reverbMix, 0.0f);
+        setParameter (processor, pid::master, 0.0f);
+        setParameter (processor, pid::track (0, pid::model), (float) ModelId::kick);
+        setParameter (processor, pid::track (0, pid::dist), (float) mode);
+        setParameter (processor, pid::track (0, pid::drive), drive);
+        setParameter (processor, pid::track (0, pid::level), 0.0f);
+
+        std::vector<Event> events;
+        events.emplace_back (0.05, juce::MidiMessage::noteOn (1, kick, (juce::uint8) 110));
+
+        return renderEvents (processor, events, 1.5);
+    };
+
+    const auto difference = [] (const juce::AudioBuffer<float>& a, const juce::AudioBuffer<float>& b)
+    {
+        const int n = std::min (a.getNumSamples(), b.getNumSamples());
+
+        if (n <= 0)
+            return 0.0f;
+
+        double sum = 0.0;
+
+        for (int i = 0; i < n; ++i)
+        {
+            const double d = (double) a.getReadPointer (0)[i] - (double) b.getReadPointer (0)[i];
+            sum += d * d;
+        }
+
+        return (float) std::sqrt (sum / n);
+    };
+
+    const auto clean = render ((int) DistortionMode::soft, 0.0f);
+    const float cleanPeak = clean.getMagnitude (0, clean.getNumSamples());
+
+    check (cleanPeak > 0.01f, "clean reference is audible",
+           juce::String (juce::Decibels::gainToDecibels (cleanPeak, -100.0f), 1) + " dBFS");
+
+    // Drive at zero must be a real bypass, whatever curve is selected.
+    const auto bypassFold = render ((int) DistortionMode::fold, 0.0f);
+    const auto bypassCrush = render ((int) DistortionMode::crush, 0.0f);
+
+    check (difference (bypassFold, bypassCrush) == 0.0f,
+           "Drive at 0 is a true bypass regardless of the selected curve");
+
+    const auto softDriven = render ((int) DistortionMode::soft, 1.0f);
+
+    for (int m = 0; m < kNumDistortionModes; ++m)
+    {
+        const juce::String name (distortionModeName (m));
+        const auto driven = render (m, 1.0f);
+        const float peak = driven.getMagnitude (0, driven.getNumSamples());
+
+        check (isFinite (driven), name + ": finite output");
+        check (peak > 0.01f && peak <= 1.0001f, name + ": audible and inside full scale",
+               juce::String (juce::Decibels::gainToDecibels (peak, -100.0f), 1) + " dBFS");
+
+        const float deltaDb = std::abs (juce::Decibels::gainToDecibels (peak / cleanPeak));
+
+        check (deltaDb < 12.0f, name + ": level-compensated against the clean signal",
+               juce::String (deltaDb, 1) + " dB difference");
+
+        if ((int) DistortionMode::soft != m)
+            check (difference (driven, softDriven) > 1.0e-4f,
+                   name + ": produces a different waveform from Soft",
+                   "rms difference " + juce::String (difference (driven, softDriven), 5));
+    }
+
+    // Harder drive must actually mean more harmonics, not just more gain.
+    const auto gentle = render ((int) DistortionMode::fold, 0.15f);
+    const auto hard = render ((int) DistortionMode::fold, 1.0f);
+
+    check (difference (gentle, hard) > 1.0e-4f, "Fold responds to the Drive amount",
+           "rms difference " + juce::String (difference (gentle, hard), 5));
+}
+
+void testKitPresets()
+{
+    section ("Factory kits");
+
+    check (numKitPresets() >= 3, "three or more kits ship with the plugin",
+           juce::String (numKitPresets()) + " kits");
+
+    const auto kitRender = [] (int kitIndex, double seconds)
+    {
+        DrumKitProcessor processor;
+        processor.prepareToPlay (sampleRate, blockSize);
+        processor.applyKitPreset (kitIndex);
+
+        std::vector<Event> events;
+
+        for (int t = 0; t < kNumTracks; ++t)
+            events.emplace_back (0.05 + t * 0.02, juce::MidiMessage::noteOn (1, primaryNoteForTrack (t), (juce::uint8) 110));
+
+        return renderEvents (processor, events, seconds);
+    };
+
+    for (int k = 0; k < numKitPresets(); ++k)
+    {
+        const auto& preset = kitPreset (k);
+        const juce::String name (preset.name);
+
+        DrumKitProcessor processor;
+        processor.prepareToPlay (sampleRate, blockSize);
+        processor.applyKitPreset (k);
+
+        bool enginesMatch = true, curvesMatch = true, tuningsMatch = true;
+
+        for (int t = 0; t < kNumTracks; ++t)
+        {
+            enginesMatch = enginesMatch && processor.getSelectedModel (t) == preset.tracks[t].model;
+
+            const auto read = [&processor, t] (const char* id)
+            {
+                return processor.apvts.getRawParameterValue (pid::track (t, id))->load();
+            };
+
+            curvesMatch = curvesMatch && (int) std::lround (read (pid::dist)) == preset.tracks[t].distMode;
+            tuningsMatch = tuningsMatch && std::abs (read (pid::tune) - preset.tracks[t].tune) < 0.02f;
+        }
+
+        check (enginesMatch, name + ": engines applied to all eight tracks");
+        check (curvesMatch, name + ": distortion curves applied");
+        check (tuningsMatch, name + ": tunings applied");
+
+        const auto audio = kitRender (k, 3.0);
+        const float peak = audio.getMagnitude (0, audio.getNumSamples());
+
+        check (isFinite (audio) && peak > 0.05f && peak <= 1.0001f,
+               name + ": plays a full eight-track hit inside full scale",
+               juce::String (juce::Decibels::gainToDecibels (peak, -100.0f), 1) + " dBFS");
+    }
+
+    // The twist has to be what you hear first.
+    DrumKitProcessor fresh;
+    fresh.prepareToPlay (sampleRate, blockSize);
+
+    check (fresh.getSelectedKit() == defaultKit(), "a fresh instance opens on the default kit");
+    check (juce::String (kitPreset (defaultKit()).name) == "Industrial",
+           "the default kit is Industrial", kitPreset (defaultKit()).name);
+
+    // And Industrial must genuinely differ from the clean Studio kit, not just by name.
+    std::vector<Event> events;
+
+    for (int t = 0; t < kNumTracks; ++t)
+        events.emplace_back (0.05 + t * 0.02, juce::MidiMessage::noteOn (1, primaryNoteForTrack (t), (juce::uint8) 110));
+
+    const auto renderKit = [&events] (int kitIndex)
+    {
+        DrumKitProcessor processor;
+        processor.prepareToPlay (sampleRate, blockSize);
+        processor.applyKitPreset (kitIndex);
+        return renderEvents (processor, events, 2.0);
+    };
+
+    const auto industrial = renderKit (defaultKit());
+    const auto studio = renderKit (numKitPresets() - 1);
+
+    const int n = std::min (industrial.getNumSamples(), studio.getNumSamples());
+    double sum = 0.0;
+
+    for (int i = 0; i < n; ++i)
+    {
+        const double d = (double) industrial.getReadPointer (0)[i] - (double) studio.getReadPointer (0)[i];
+        sum += d * d;
+    }
+
+    const float difference = (float) std::sqrt (sum / juce::jmax (1, n));
+    const float reference = studio.getRMSLevel (0, 0, n);
+
+    check (difference > reference * 0.5f,
+           "the Industrial kit sounds substantially different from Studio",
+           "difference " + juce::String (juce::Decibels::gainToDecibels (difference, -100.0f), 1)
+             + " dB vs reference rms " + juce::String (juce::Decibels::gainToDecibels (reference, -100.0f), 1) + " dB");
+}
+
 } // namespace
 
 int main()
@@ -709,6 +894,8 @@ int main()
     testSoloMute();
     testReverbSend();
     testHostLifecycle();
+    testDistortionModes();
+    testKitPresets();
 
     std::cout << "\n============================\n"
               << passed << " passed, " << failed << " failed\n";

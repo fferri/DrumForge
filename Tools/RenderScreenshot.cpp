@@ -75,8 +75,9 @@ int main (int argc, char** argv)
         return 1;
     }
 
-    // Hosts resize the editor; make sure that path works too.
-    for (auto size : { juce::Point<int> (1120, 600), juce::Point<int> (1600, 900), juce::Point<int> (1280, 720) })
+    // Hosts resize the editor; make sure that path works across the whole allowed range.
+    for (auto size : { juce::Point<int> (1120, 660), juce::Point<int> (1280, 752),
+                       juce::Point<int> (1600, 900), juce::Point<int> (2400, 1500) })
     {
         editor->setSize (size.x, size.y);
         editor->setBounds (0, 0, size.x, size.y);
@@ -92,7 +93,7 @@ int main (int argc, char** argv)
         std::cout << "rendered at " << size.x << "x" << size.y << "\n";
     }
 
-    editor->setSize (1280, 720);
+    editor->setSize (1280, 752);
 
     // Fire a few pads and let the meters and pad glow settle, so the screenshot
     // shows the UI in a playing state.

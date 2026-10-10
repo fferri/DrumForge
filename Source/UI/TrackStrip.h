@@ -67,6 +67,7 @@ private:
     const int trackIndex;
 
     juce::ComboBox modelBox;
+    juce::ComboBox distBox;
     PadButton pad;
     juce::TextButton muteButton { "M" }, soloButton { "S" };
 
@@ -74,8 +75,9 @@ private:
     std::unique_ptr<ModelKnob> tuneKnob, levelKnob, panKnob, driveKnob, sendKnob;
 
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> muteAttachment, soloAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> distAttachment;
 
-    juce::Rectangle<int> headerArea, padArea, meterArea, comboArea, macroArea, utilArea;
+    juce::Rectangle<int> headerArea, padArea, meterArea, comboArea, distArea, macroArea, utilArea;
 
     juce::String noteLabel;
     int displayedModel = -1;

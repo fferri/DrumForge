@@ -112,6 +112,18 @@ TrackStrip::TrackStrip (DrumKitProcessor& owner, int index)
     };
     addAndMakeVisible (modelBox);
 
+    // ---- Distortion curve ---------------------------------------------------
+    for (int m = 0; m < kNumDistortionModes; ++m)
+        distBox.addItem (distortionModeName (m), m + 1);
+
+    distBox.setTooltip ("Saturation curve for this track's Drive knob.\n"
+                        "Soft: warm tanh.  Hard: clip.  Fold: wavefolder, metallic.\n"
+                        "Fuzz: asymmetric, thick even harmonics.  Crush: bit reduction.");
+    addAndMakeVisible (distBox);
+
+    distAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (
+        processor.apvts, id (pid::dist), distBox);
+
     // ---- Engine macros ------------------------------------------------------
     decayKnob     = std::make_unique<ModelKnob> (processor.apvts, id (pid::decay));
     toneKnob      = std::make_unique<ModelKnob> (processor.apvts, id (pid::tone));
@@ -271,6 +283,9 @@ void TrackStrip::resized()
     area.removeFromTop (5);
 
     comboArea = area.removeFromTop (22);
+    area.removeFromTop (3);
+
+    distArea = area.removeFromTop (20);
     area.removeFromTop (6);
 
     const int remaining = area.getHeight();
@@ -292,6 +307,7 @@ void TrackStrip::resized()
     soloButton.setBounds (buttonCell.reduced (2, 0));
 
     modelBox.setBounds (comboArea);
+    distBox.setBounds (distArea);
     pad.setBounds (padArea);
 }
 

@@ -289,6 +289,34 @@ void DrumKitProcessor::applyModelDefaults (int trackIndex)
     applyModelDefaults (trackIndex, getSelectedModel (trackIndex));
 }
 
+int DrumKitProcessor::getSelectedKit() const noexcept
+{
+    return (int) std::lround (globalRefs.kit->load());
+}
+
+void DrumKitProcessor::applyKitPreset (int kitIndex)
+{
+    const auto& preset = kitPreset (kitIndex);
+
+    for (int t = 0; t < kNumTracks; ++t)
+    {
+        const auto& d = preset.tracks[t];
+        const auto id = [t] (const char* name) { return pid::track (t, name); };
+
+        setParameterValue (apvts, id (pid::model),     (float) d.model);
+        setParameterValue (apvts, id (pid::dist),      (float) d.distMode);
+        setParameterValue (apvts, id (pid::level),     d.level);
+        setParameterValue (apvts, id (pid::pan),       d.pan);
+        setParameterValue (apvts, id (pid::tune),      d.tune);
+        setParameterValue (apvts, id (pid::decay),     d.decay);
+        setParameterValue (apvts, id (pid::tone),      d.tone);
+        setParameterValue (apvts, id (pid::character), d.character);
+        setParameterValue (apvts, id (pid::sweep),     d.sweep);
+        setParameterValue (apvts, id (pid::drive),     d.drive);
+        setParameterValue (apvts, id (pid::send),      d.send);
+    }
+}
+
 juce::AudioProcessorEditor* DrumKitProcessor::createEditor()
 {
     return new DrumKitEditor (*this);

@@ -8,7 +8,7 @@
 namespace df
 {
 
-/** The seven synthesis engines. A track can load any one of them. */
+/** The synthesis engines. A track can load any one of them. */
 enum class ModelId
 {
     kick = 0,
@@ -18,6 +18,8 @@ enum class ModelId
     clap,
     cymbal,
     fmPerc,
+    clang,
+    rumble,
     count
 };
 
@@ -40,6 +42,7 @@ struct ModelParams
     float sweep     = 0.5f;   // 0..1
     float drive     = 0.0f;   // 0..1
     float send      = 0.0f;   // 0..1
+    int   distMode  = 0;      // DistortionMode, applied by the track
 };
 
 /** Static description of a model, used to label the UI and to pick sane defaults. */
