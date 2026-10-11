@@ -381,34 +381,54 @@ under the *Drum* category.
 
 ### Prebuilt packages
 
- builds both platforms on every push and attaches the result
+`.github/workflows/build.yml` builds both platforms on every push and attaches the result
 to the run as a downloadable artifact:
 
 | Platform | Artifact |
 |---|---|
-| macOS |  — one binary for Intel and Apple Silicon |
-| Windows |  |
+| macOS | `DrumForge-macOS-universal.zip` — one binary for Intel and Apple Silicon, plus an install script |
+| Windows | `DrumForge-Windows-x64.zip` |
 
-Pushing a tag starting with  turns a build into a release, with both packages attached
+Pushing a tag starting with `v` turns a build into a release, with both packages attached
 and notes generated from the commits:
 
+```sh
+git tag v1.0.0
+git push origin v1.0.0
+```
 
+A documentation-only push rebuilds nothing: the workflow ignores changes to `**.md`,
+`LICENSE` and `.gitignore`. Path filters are not evaluated for tag pushes, so tagging always
+builds and releases.
 
 Each build also runs the offline test suite, so a package is only produced if the engines,
 kits and state handling all pass on that platform.
 
 ### Installing the macOS package
 
-The macOS build is **ad-hoc signed, not notarised**. A browser download therefore arrives
-with the quarantine flag set, and Gatekeeper refuses to load it. The flag has to be cleared
-once, after copying the plugin into place:
+Unzip, then run the installer that sits next to the plugin:
+
+```sh
+./install-macos.sh
+```
+
+That copies `DrumForge.vst3` into `~/Library/Audio/Plug-Ins/VST3` and clears the
+**quarantine** flag. The flag is the part that matters: a browser download sets it, and
+Gatekeeper refuses to load quarantined code, so without this step most DAWs will not see
+the plugin at all. Pass a path to install somewhere else:
+
+```sh
+./install-macos.sh /Library/Audio/Plug-Ins/VST3
+```
+
+To do it by hand instead, copy the plugin into place and run:
 
 ```sh
 xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/DrumForge.vst3
 ```
 
-Then rescan plugins in your DAW. Downloading from a terminal (`curl`, `gh release
-download`) does not set the flag in the first place, so it needs no fix-up.
+Downloading from a terminal (`curl`, `gh release download`) sets no quarantine flag in the
+first place, so neither route is needed.
 
 Signing it yourself does not help. The build is already a valid signature — `codesign
 --verify` reports "valid on disk" — and `spctl -a` still answers `rejected`, because

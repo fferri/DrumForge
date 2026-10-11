@@ -4,6 +4,12 @@ on:
   push:
     branches: [main, master]
     tags: ["v*"]
+    # Documentation and licence changes cannot alter the binaries. Path filters are not
+    # evaluated for tag pushes, so tagging still builds and releases as normal.
+    paths-ignore:
+      - "**.md"
+      - LICENSE
+      - .gitignore
   pull_request:
   workflow_dispatch:
 
@@ -71,9 +77,19 @@ jobs:
 
       - name: Package
         run: |
-          ditto -c -k --sequesterRsrc --keepParent \
-            build/DrumForge_artefacts/Release/VST3/DrumForge.vst3 \
-            DrumForge-macOS-universal.zip
+          # A flat archive: the plugin and the installer side by side, so unzipping gives
+          # something the reader can act on rather than a folder to dig through. zip keeps
+          # the executable bit, which matters for the script.
+          stage=$(mktemp -d)
+          cp -R build/DrumForge_artefacts/Release/VST3/DrumForge.vst3 "$stage/"
+          cp scripts/install-macos.sh "$stage/"
+          chmod +x "$stage/install-macos.sh"
+
+          out="$PWD/DrumForge-macOS-universal.zip"
+          ( cd "$stage" && zip -q -r -y "$out" DrumForge.vst3 install-macos.sh )
+          rm -rf "$stage"
+
+          unzip -l DrumForge-macOS-universal.zip
 
       - uses: actions/upload-artifact@v4
         with:
