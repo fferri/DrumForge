@@ -69,6 +69,24 @@ target_link_libraries(DrumForge PRIVATE DrumForgeCore)
 target_compile_definitions(DrumForge PUBLIC
     JUCE_VST3_CAN_REPLACE_VST2=0)
 
+# CMake signs the bundle as part of linking, but JUCE writes
+# Contents/Resources/moduleinfo.json in a POST_BUILD step that runs *after* the link. A fresh
+# build therefore ships a signature that does not seal that file, and macOS reports
+# "a sealed resource is missing or invalid" - an invalid signature, not merely an ad-hoc one.
+# Gatekeeper may then refuse the plugin even once the quarantine flag is cleared.
+#
+# Signing again here fixes it. This is registered after juce_add_plugin, and custom commands
+# on a target run in the order they were added, so it runs after JUCE's own POST_BUILD steps
+# and seals whatever is actually in the bundle by then. The verify command is deliberate: a
+# regression should fail the build, not ship quietly.
+if(APPLE)
+    add_custom_command(TARGET DrumForge_VST3 POST_BUILD
+        COMMAND codesign --force --sign - "$<TARGET_BUNDLE_DIR:DrumForge_VST3>"
+        COMMAND codesign --verify --verbose=2 "$<TARGET_BUNDLE_DIR:DrumForge_VST3>"
+        COMMENT "Re-signing DrumForge.vst3 after moduleinfo.json is written"
+        VERBATIM)
+endif()
+
 #===============================================================================
 # Offline tools (headless; they drive the processor directly).
 #===============================================================================
