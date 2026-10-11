@@ -509,8 +509,12 @@ void testUiTriggerAndMetering()
 
     check (processor.getTrackTriggerCount (0) == 1, "queued pad hit fired track 1");
     check (processor.getTrackTriggerCount (4) == 1, "queued pad hit fired track 5");
-    check (processor.readTrackPeak (0) > 0.001f, "track 1 reported a peak level",
-           juce::String (processor.readTrackPeak (0), 4));
+    // Read once. readTrackPeak clears as it reads, and argument evaluation order is
+    // unspecified in C++, so calling it in both the condition and the detail left the
+    // result up to the compiler: clang evaluates the condition first and passes, MSVC
+    // evaluates the detail first, consumes the peak, and fails the condition.
+    const float firstPeak = processor.readTrackPeak (0);
+    check (firstPeak > 0.001f, "track 1 reported a peak level", juce::String (firstPeak, 4));
     check (processor.readTrackPeak (0) == 0.0f, "peak read clears the meter");
 }
 

@@ -53,6 +53,8 @@ public:
     /** Queues a hit for the audio thread. Safe to call from the message thread. */
     void triggerTrack (int trackIndex, float velocity);
 
+    /** Reads the track's peak since the last call, and clears it. Read-and-clear, so it
+        must not be called twice for one observation - the second call returns zero. */
     float readTrackPeak (int trackIndex) noexcept;
     uint32_t getTrackTriggerCount (int trackIndex) const noexcept;
 
