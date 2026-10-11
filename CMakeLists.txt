@@ -23,6 +23,7 @@ add_library(DrumForgeCore STATIC
     Source/Core/DrumKitProcessor.cpp
     Source/UI/Theme.cpp
     Source/UI/ModelKnob.cpp
+    Source/UI/VelocityKnob.cpp
     Source/UI/TrackStrip.cpp
     Source/UI/DrumKitEditor.cpp)
 

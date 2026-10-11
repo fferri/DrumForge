@@ -88,8 +88,8 @@ void PadButton::mouseUp (const juce::MouseEvent&)
 }
 
 //==============================================================================
-TrackStrip::TrackStrip (DrumKitProcessor& owner, int index)
-    : processor (owner), trackIndex (index)
+TrackStrip::TrackStrip (DrumKitProcessor& owner, int index, EditorUiState& state)
+    : processor (owner), trackIndex (index), uiState (state)
 {
     const auto id = [this] (const char* name) { return pid::track (trackIndex, name); };
 
@@ -125,17 +125,23 @@ TrackStrip::TrackStrip (DrumKitProcessor& owner, int index)
         processor.apvts, id (pid::dist), distBox);
 
     // ---- Engine macros ------------------------------------------------------
-    decayKnob     = std::make_unique<ModelKnob> (processor.apvts, id (pid::decay));
-    toneKnob      = std::make_unique<ModelKnob> (processor.apvts, id (pid::tone));
-    characterKnob = std::make_unique<ModelKnob> (processor.apvts, id (pid::character));
-    sweepKnob     = std::make_unique<ModelKnob> (processor.apvts, id (pid::sweep));
+    const auto makeKnob = [this, &id] (const char* parameterName, ModTarget target)
+    {
+        return std::make_unique<ModelKnob> (processor, trackIndex, (int) target,
+                                            uiState, id (parameterName));
+    };
+
+    decayKnob     = makeKnob (pid::decay,     ModTarget::decay);
+    toneKnob      = makeKnob (pid::tone,      ModTarget::tone);
+    characterKnob = makeKnob (pid::character, ModTarget::character);
+    sweepKnob     = makeKnob (pid::sweep,     ModTarget::sweep);
 
     // ---- Per-track controls -------------------------------------------------
-    tuneKnob  = std::make_unique<ModelKnob> (processor.apvts, id (pid::tune));
-    levelKnob = std::make_unique<ModelKnob> (processor.apvts, id (pid::level));
-    panKnob   = std::make_unique<ModelKnob> (processor.apvts, id (pid::pan));
-    driveKnob = std::make_unique<ModelKnob> (processor.apvts, id (pid::drive));
-    sendKnob  = std::make_unique<ModelKnob> (processor.apvts, id (pid::send));
+    tuneKnob  = makeKnob (pid::tune,  ModTarget::tune);
+    levelKnob = makeKnob (pid::level, ModTarget::level);
+    panKnob   = makeKnob (pid::pan,   ModTarget::pan);
+    driveKnob = makeKnob (pid::drive, ModTarget::drive);
+    sendKnob  = makeKnob (pid::send,  ModTarget::send);
 
     for (auto* knob : { decayKnob.get(), toneKnob.get(), characterKnob.get(), sweepKnob.get(),
                         tuneKnob.get(), levelKnob.get(), panKnob.get(), driveKnob.get(), sendKnob.get() })
@@ -223,6 +229,10 @@ void TrackStrip::updateFromProcessor()
         displayedModel = model;
         updateModelDependentUi();
     }
+
+    for (auto* knob : { decayKnob.get(), toneKnob.get(), characterKnob.get(), sweepKnob.get(),
+                        tuneKnob.get(), levelKnob.get(), panKnob.get(), driveKnob.get(), sendKnob.get() })
+        knob->refreshFromProcessor();
 
     const uint32_t triggerCount = processor.getTrackTriggerCount (trackIndex);
 
@@ -315,10 +325,14 @@ void TrackStrip::paint (juce::Graphics& g)
 {
     const auto bounds = getLocalBounds().toFloat().reduced (1.0f);
 
+    const bool armed = uiState.modArmed.load();
+
     g.setColour (theme::panel);
     g.fillRoundedRectangle (bounds, 6.0f);
-    g.setColour (theme::outline);
-    g.drawRoundedRectangle (bounds, 6.0f, 1.0f);
+
+    // Unmistakable mode indicator: every strip goes hot while MOD is armed.
+    g.setColour (armed ? theme::velocityHard.withAlpha (0.8f) : theme::outline);
+    g.drawRoundedRectangle (bounds, 6.0f, armed ? 1.8f : 1.0f);
 
     const int model = juce::jlimit (0, kNumModels - 1, displayedModel);
     const auto& info = getModelInfo (model);

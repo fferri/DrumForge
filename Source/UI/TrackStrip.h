@@ -8,6 +8,7 @@
 #include "../Core/DrumKitProcessor.h"
 #include "ModelKnob.h"
 #include "Theme.h"
+#include "UiState.h"
 
 namespace df
 {
@@ -47,7 +48,7 @@ private:
 class TrackStrip final : public juce::Component
 {
 public:
-    TrackStrip (DrumKitProcessor& processor, int trackIndex);
+    TrackStrip (DrumKitProcessor& processor, int trackIndex, EditorUiState& uiState);
 
     void resized() override;
     void paint (juce::Graphics&) override;
@@ -65,6 +66,7 @@ private:
 
     DrumKitProcessor& processor;
     const int trackIndex;
+    EditorUiState& uiState;
 
     juce::ComboBox modelBox;
     juce::ComboBox distBox;

@@ -9,6 +9,7 @@
 #include "ModelKnob.h"
 #include "Theme.h"
 #include "TrackStrip.h"
+#include "UiState.h"
 
 namespace df
 {
@@ -38,12 +39,15 @@ private:
     juce::TooltipWindow tooltipWindow { this, 650 };
 
     juce::ComboBox kitBox;
+    juce::TextButton modButton { "MOD" };
+
+    EditorUiState uiState;
 
     std::array<std::unique_ptr<TrackStrip>, (size_t) kNumTracks> strips;
     std::unique_ptr<ModelKnob> masterKnob;
     std::array<std::unique_ptr<ModelKnob>, 4> reverbKnobs;
 
-    juce::Rectangle<int> headerArea, titleArea, kitArea, kitCaptionArea, globalKnobArea;
+    juce::Rectangle<int> headerArea, titleArea, kitArea, kitCaptionArea, modArea, globalKnobArea;
     int displayedKit = -1;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DrumKitEditor)

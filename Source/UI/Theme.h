@@ -15,6 +15,11 @@ inline const juce::Colour accent     { 0xffe8a33a };
 inline const juce::Colour meter      { 0xff4fd08a };
 inline const juce::Colour meterHot   { 0xffe8574a };
 
+// Velocity modulation band. Cool marks a soft hit, hot marks a hard one, so a negative
+// depth visibly reverses the gradient rather than just moving it.
+inline const juce::Colour velocitySoft { 0xff3f86d8 };
+inline const juce::Colour velocityHard { 0xfff06a3a };
+
 /** JUCE 9 requires FontOptions; this keeps the call sites short. */
 inline juce::Font font (float height, int styleFlags = juce::Font::plain)
 {
@@ -26,15 +31,16 @@ inline juce::Font font (float height, int styleFlags = juce::Font::plain)
 namespace df
 {
 
-/** Dark drum-machine styling: chunky rotary knobs with an accent arc. */
+/** Dark drum-machine styling for everything except the rotary knobs.
+
+    The knobs deliberately do not use this: they carry per-parameter velocity modulation
+    state and a LookAndFeel instance is shared by every control, so they paint themselves
+    (see VelocityKnob).
+*/
 class DrumForgeLookAndFeel final : public juce::LookAndFeel_V4
 {
 public:
     DrumForgeLookAndFeel();
-
-    void drawRotarySlider (juce::Graphics&, int x, int y, int width, int height,
-                           float sliderPosProportional, float rotaryStartAngle,
-                           float rotaryEndAngle, juce::Slider&) override;
 
     juce::Font getComboBoxFont (juce::ComboBox&) override;
     juce::Font getLabelFont (juce::Label&) override;

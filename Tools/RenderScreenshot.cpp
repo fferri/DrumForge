@@ -95,8 +95,16 @@ int main (int argc, char** argv)
 
     editor->setSize (1280, 752);
 
-    // Fire a few pads and let the meters and pad glow settle, so the screenshot
-    // shows the UI in a playing state.
+    // Dial in some velocity modulation so the bands are actually visible, deliberately
+    // mixing polarities and targets so both gradient directions appear.
+    processor.setModulationDepth (0, (int) ModTarget::tone,      0.45f);
+    processor.setModulationDepth (1, (int) ModTarget::character, -0.35f);
+    processor.setModulationDepth (2, (int) ModTarget::level,     0.25f);
+    processor.setModulationDepth (3, (int) ModTarget::decay,     0.50f);
+    processor.setModulationDepth (4, (int) ModTarget::drive,     0.40f);
+    processor.setModulationDepth (5, (int) ModTarget::sweep,    -0.50f);
+
+    // Fire a few pads at different velocities so the last-hit dots land off the pointers.
     processor.triggerTrack (0, 1.0f);
     processor.triggerTrack (3, 0.9f);
     processor.triggerTrack (4, 0.8f);

@@ -10,6 +10,9 @@ level and reverb send, and there are no samples anywhere in the plugin.
 
 ![DrumForge](docs/screenshot.png)
 
+*Knobs with a velocity depth dialled in show a coloured band for the range velocity can
+reach, and a dot for where the last hit actually landed.*
+
 ---
 
 ## The nine engines
@@ -105,6 +108,25 @@ Depths are deliberately **not** automation parameters. Automating a knob and aut
 velocity already spans the space — depth is only the slope between them, which is exactly
 the thing that should stay static. They are still saved with your session.
 
+### Seeing and setting a depth
+
+A modulated knob draws three things: the **pointer** at the value you dialled, a coloured
+**band** spanning every position velocity can reach, and a **dot** showing where the most
+recent hit actually landed. The band is a gradient — cool for a soft hit, hot for a hard
+one — and it is coloured by *velocity* rather than by screen position, so a negative depth
+visibly **reverses** the gradient instead of merely sliding it. With depth at 0 none of it
+is drawn and the knob reverts to the classic single-value look.
+
+| Gesture | Effect |
+|---|---|
+| Drag the **rim** of a knob | sets that knob's velocity depth |
+| Arm **MOD** in the header, then drag anywhere on a knob | sets the depth, with a much larger target |
+| Double-click the rim | resets that depth to 0 |
+| Right-click | reset, clear this track, or clear every track |
+
+Arming MOD tints every strip and switches the numeric readouts over to the depth, so there
+is no mistaking which mode you are in.
+
 ---
 
 ## Factory kits
@@ -169,10 +191,12 @@ Source/
     Parameters.h/.cpp     APVTS layout, GM note map, factory kits
     DrumKitProcessor.*    the AudioProcessor: 8 tracks, MIDI, reverb bus, master
   UI/
-    Theme.*               dark industrial look and feel
-    ModelKnob.*           rotary + live-relabelling caption
+    UiState.h             editor-wide state the knobs need on every paint (MOD armed)
+    Theme.*               dark industrial look and feel for everything but the knobs
+    VelocityKnob.*        the rotary itself: band, last-hit dot, rim drag, context menu
+    ModelKnob.*           velocity knob + live-relabelling caption + value readout
     TrackStrip.*          pad, engine + distortion selectors, knobs, mute/solo, meter
-    DrumKitEditor.*       window layout and the kit selector
+    DrumKitEditor.*       window layout, kit selector, MOD toggle
   PluginEntry.cpp         createPluginFilter()
 Tools/
   RenderDemo.cpp          offline WAV renderer
@@ -203,6 +227,11 @@ Design points worth knowing:
 - **Velocity enters the system in exactly one place.** The engines no longer read it at all;
   it reaches them only as already-modulated parameter values, which is what makes the
   behaviour adjustable instead of hard-coded.
+- **The knobs paint themselves rather than using the shared LookAndFeel.** A LookAndFeel
+  instance serves every control in the editor, so it cannot hold per-knob state like a
+  modulation depth. `VelocityKnob` is a Slider subclass that draws its own band and dot.
+- **The band and the audio share one implementation.** Both go through `velocityBand()` and
+  the same normalised-space maths, so what the editor draws cannot drift from what you hear.
 
 ---
 
@@ -218,6 +247,9 @@ Each track strip, top to bottom:
 - **Four macro knobs** — `Decay`, `Tone`, `Character`, `Sweep`, captioned per engine.
 - **Per-track controls** — `Tune`, `Level`, `Pan`, `Drive`, `Send`.
 - **M / S** — mute and solo. **Level meter** between the pad and the engine selector.
+
+Every one of those nine knobs accepts a velocity depth. The globals in the top bar
+(`Master` and the reverb) do not, because there is no per-hit meaning to attach to them.
 
 The top bar holds the **Kit** selector, the global `Master` level and the shared reverb
 (`Size`, `Damp`, `Mix`, `Width`). `Send` on each track feeds that reverb bus post-fader.
@@ -267,7 +299,8 @@ plays inside full scale and still has a usable dynamic range; that the velocity 
 at 100, is symmetric and is monotonic; that depth 0 is an exact bypass at any velocity and a
 nominal hit is bit-identical whatever the depth; that modulation clamps rather than wraps;
 and that depths survive a session save while a session without them clears any leftovers;
-that the GM note map, the hi-hat choke group, mute, solo
+that the band the editor draws spans exactly the range the audio path applies, including on
+a skewed range; that the GM note map, the hi-hat choke group, mute, solo
 and the post-fader reverb send all behave; that state round-trips exactly; and that the
 plugin survives the full host lifecycle — repeated `prepareToPlay`, `releaseResources` in
 between, sample-rate and buffer-size changes, and blocks larger or smaller than the
@@ -280,8 +313,10 @@ editor construction and painting, state save/restore, and the prepare/release cy
 performs on buffer-size changes and device re-activation.
 
 **`DrumForgeScreenshot`** instantiates the editor at four window sizes across the whole
-allowed range and renders it to a PNG, which catches layout and painting problems that the
-headless tests cannot.
+allowed range and renders it to a PNG with modulation depths dialled in, which is the only
+way to check the band and dot actually draw. It catches layout and painting problems that
+the headless tests cannot — but note that the *gestures* (rim drag, MOD drag, right-click)
+have no automated coverage; only the maths behind them does.
 
 **`DrumForgeRender`** writes one isolated clean hit per engine, the same four-bar beat
 played through each factory kit (`kit_Industrial.wav`, `kit_Warehouse.wav`,

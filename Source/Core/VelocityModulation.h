@@ -153,14 +153,18 @@ inline void applyVelocityModulation (const TrackModRefs& refs,
     Returns false when the knob is unmodulated, in which case the caller should draw the
     classic single-value knob. Used by the editor to draw the band; kept here so the maths
     the UI shows and the maths the audio applies can never drift apart.
+
+    Templated on the range's value type because Slider::getRange() hands out
+    NormalisableRange<double> while the parameters carry NormalisableRange<float>.
 */
-inline bool velocityBand (const juce::NormalisableRange<float>& range,
-                          float baseValue,
+template <typename ValueType>
+inline bool velocityBand (const juce::NormalisableRange<ValueType>& range,
+                          ValueType baseValue,
                           float depth,
                           float& lowNormalised,
                           float& highNormalised) noexcept
 {
-    const float centre = range.convertTo0to1 (baseValue);
+    const float centre = (float) range.convertTo0to1 (baseValue);
 
     if (std::abs (depth) < 1.0e-6f)
     {
