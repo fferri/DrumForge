@@ -220,6 +220,34 @@ correctly. Unmapped notes are ignored.
 
 **The closed and pedal hi-hats choke the open hi-hat**, exactly as in General MIDI.
 
+### Using a BeatStep Pro
+
+An Arturia BeatStep Pro's drum sequencer does not send GM notes. Its pads send `39, 37, 51,
+52, 60, 66, 58, 83`, which is a different language entirely — and one that *collides* with
+GM: note 39 is a hand clap in General MIDI and the first pad on a BeatStep.
+
+So this is a switch, not a union. Right-click any pad, or use the menu behind the kit name,
+and pick **MIDI note map → BeatStep Pro**:
+
+| Track | GM | BeatStep Pro |
+|---|---|---|
+| 1 | 36 | 39 |
+| 2 | 38 | 37 |
+| 3 | 42 | 51 |
+| 4 | 46 | 52 |
+| 5 | 39 | 60 |
+| 6 | 45 | 66 |
+| 7 | 49 | 58 |
+| 8 | 51 | 83 |
+
+Each map ignores the other's notes, so note 36 does nothing while the BeatStep map is
+selected. The note number shown in each track's header follows the choice.
+
+The setting is stored **globally**, in `~/Library/Application Support/DrumForge/settings.xml`,
+rather than in the session: it describes the hardware in front of you, not the song, so a
+new project does not start on the wrong map. Tell me if you would rather it travelled with
+the project instead.
+
 Note that the Industrial kit puts a sub drone on the tom notes and an atonal clang on the
 crash notes — deliberate, but easy to change: every track loads any engine.
 
@@ -244,6 +272,7 @@ Source/
     DrumTrack.h           one track: engine hosting, per-track FX, metering
     Parameters.h/.cpp     APVTS layout, GM note map, factory kits
     DrumKitProcessor.*    the AudioProcessor: 8 tracks, MIDI, reverb bus, master
+    Settings.*            global preferences (the note map), kept out of the session
   UI/
     UiState.h             editor-wide state the knobs need on every paint (MOD armed)
     Theme.*               dark industrial look and feel for everything but the knobs
@@ -254,7 +283,7 @@ Source/
   PluginEntry.cpp         createPluginFilter()
 Tools/
   RenderDemo.cpp          offline WAV renderer
-  RenderTests.cpp         offline verification suite (388 checks)
+  RenderTests.cpp         offline verification suite (406 checks)
   RenderScreenshot.cpp    editor smoke test / screenshot generator
   HostLoadTest.cpp        loads the built .vst3 through a real VST3 host (22 checks)
 ```
@@ -357,7 +386,7 @@ under the *Drum* category.
 
 ```sh
 cmake --build build
-./build/DrumForgeTests_artefacts/Release/DrumForgeTests              # 388 checks
+./build/DrumForgeTests_artefacts/Release/DrumForgeTests              # 406 checks
 ./build/DrumForgeHostTest_artefacts/Release/DrumForgeHostTest.app/Contents/MacOS/DrumForgeHostTest   # 22 checks
 ./build/DrumForgeScreenshot_artefacts/Release/DrumForgeScreenshot.app/Contents/MacOS/DrumForgeScreenshot docs/screenshot.png
 ./build/DrumForgeRender_artefacts/Release/DrumForgeRender renders    # writes WAVs you can listen to
@@ -381,7 +410,9 @@ rolls; that kits survive XML and a round-trip through the filesystem, that
 re-saving replaces rather than duplicates, and that a name full of filename-hostile
 characters still works;
 that the band the editor draws spans exactly the range the audio path applies, including on
-a skewed range; that the GM note map, the hi-hat choke group, mute, solo
+a skewed range; that both note maps resolve every pad back to its own track and ignore each other's notes,
+and that a new instance starts on the map last chosen while a corrupt settings file falls
+back to General MIDI; that the GM note map, the hi-hat choke group, mute, solo
 and the post-fader reverb send all behave; that state round-trips exactly; and that the
 plugin survives the full host lifecycle — repeated `prepareToPlay`, `releaseResources` in
 between, sample-rate and buffer-size changes, and blocks larger or smaller than the

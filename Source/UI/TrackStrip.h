@@ -23,6 +23,9 @@ class PadButton final : public juce::Component,
 public:
     std::function<void (float velocity)> onHit;
 
+    /** Fired on right-click, so the editor can offer its settings menu from the pad. */
+    std::function<void()> onContextMenu;
+
     void setAccentColour (juce::Colour newAccent);
     void setSubtitle (juce::String newSubtitle);
     void setTitle (juce::String newTitle);
@@ -57,6 +60,10 @@ public:
     /** Called from the editor's timer: syncs the engine selector, meters and glow. */
     void updateFromProcessor();
 
+    /** Right-clicking a pad is the discoverable way into the note map, since the pads are
+        what responds to it. */
+    std::function<void()> onPadContextMenu;
+
     int getTrackIndex() const noexcept { return trackIndex; }
 
 private:
@@ -87,6 +94,7 @@ private:
     juce::Rectangle<int> headerArea, headerButtonArea, padArea, meterArea, comboArea, distArea, macroArea, utilArea;
 
     juce::String noteLabel;
+    NoteMap displayedNoteMap = NoteMap::generalMidi;
     int displayedModel = -1;
     uint32_t lastTriggerCount = 0;
     float displayedPeak = 0.0f;

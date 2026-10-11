@@ -30,6 +30,7 @@ private:
     void timerCallback() override;
 
     void showKitMenu();
+    void showNoteMapMenu (juce::Component* target);
     void handleKitMenuResult (int result);
     void loadKit (int index);
     void saveCurrentKitAs();

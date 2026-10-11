@@ -20,6 +20,7 @@
 #include "Core/DrumKitProcessor.h"
 #include "Core/KitLibrary.h"
 #include "Core/Randomizer.h"
+#include "Core/Settings.h"
 
 using namespace df;
 
@@ -1419,10 +1420,120 @@ void testRandomiser()
            "quietest " + juce::String (juce::Decibels::gainToDecibels (quietest, -100.0f), 1) + " dBFS");
 }
 
+void testNoteMapOptions()
+{
+    section ("Note map: General MIDI or BeatStep Pro");
+
+    // ---- General MIDI is still the default ---------------------------------
+    const int gmNotes[kNumTracks] = { 36, 38, 42, 46, 39, 45, 49, 51 };
+
+    bool gmMatches = true;
+    for (int t = 0; t < kNumTracks; ++t)
+        gmMatches = gmMatches && primaryNoteForTrack (t) == gmNotes[t];
+
+    check (gmMatches, "the default map is unchanged");
+
+    // ---- the BeatStep Pro numbers ------------------------------------------
+    const int bspNotes[kNumTracks] = { 39, 37, 51, 52, 60, 66, 58, 83 };
+
+    bool bspMatches = true;
+    for (int t = 0; t < kNumTracks; ++t)
+    {
+        const int note = primaryNoteForTrack (t, NoteMap::beatStepPro);
+        bspMatches = bspMatches && note == bspNotes[t]
+                       && trackForMidiNote (note, NoteMap::beatStepPro) == t;
+    }
+
+    check (bspMatches, "every BeatStep pad resolves back to its own track");
+
+    // ---- the two maps genuinely disagree -----------------------------------
+    // This is why it has to be a switch rather than a union: the same note means two
+    // different things, so accepting both at once is impossible.
+    check (trackForMidiNote (39, NoteMap::generalMidi) == 4
+             && trackForMidiNote (39, NoteMap::beatStepPro) == 0,
+           "note 39 is the clap under GM but the kick on a BeatStep");
+    check (trackForMidiNote (51, NoteMap::generalMidi) == 7
+             && trackForMidiNote (51, NoteMap::beatStepPro) == 2,
+           "note 51 is the ride under GM but a hat on a BeatStep");
+
+    check (trackForMidiNote (36, NoteMap::beatStepPro) == -1,
+           "the GM kick note does nothing once the BeatStep map is selected");
+    check (trackForMidiNote (83, NoteMap::generalMidi) == -1,
+           "and the BeatStep's last pad does nothing under GM");
+
+    // ---- through the processor ---------------------------------------------
+    DrumKitProcessor processor;
+    processor.prepareToPlay (sampleRate, blockSize);
+
+    check (processor.getNoteMap() == NoteMap::generalMidi,
+           "a fresh instance starts on General MIDI");
+
+    const auto triggerWith = [&processor] (int note)
+    {
+        std::vector<Event> events;
+        events.emplace_back (0.0, juce::MidiMessage::noteOn (1, note, (juce::uint8) 110));
+        renderEvents (processor, events, 0.2);
+    };
+
+    processor.setNoteMap (NoteMap::beatStepPro);
+    check (processor.getNoteMap() == NoteMap::beatStepPro, "the map can be changed");
+
+    const auto kickBefore = processor.getTrackTriggerCount (0);
+    const auto clapBefore = processor.getTrackTriggerCount (4);
+
+    triggerWith (39);
+
+    check (processor.getTrackTriggerCount (0) == kickBefore + 1,
+           "note 39 now triggers the kick");
+    check (processor.getTrackTriggerCount (4) == clapBefore,
+           "and no longer the clap");
+
+    const auto lastBefore = processor.getTrackTriggerCount (7);
+    triggerWith (83);
+    check (processor.getTrackTriggerCount (7) == lastBefore + 1,
+           "the BeatStep's last pad reaches the last track");
+
+    // The map is a global preference, so a new instance picks it up.
+    DrumKitProcessor reopened;
+    reopened.prepareToPlay (sampleRate, blockSize);
+    check (reopened.getNoteMap() == NoteMap::beatStepPro,
+           "a new instance starts on the map last chosen");
+
+    // ---- persistence is self-contained -------------------------------------
+    check (juce::String (noteMapName (NoteMap::generalMidi)) == "General MIDI"
+             && juce::String (noteMapName (NoteMap::beatStepPro)) == "BeatStep Pro",
+           "both maps have names for the menu");
+
+    // A missing or corrupt settings file must fall back rather than misbehave.
+    auto scratch = juce::File::getCurrentWorkingDirectory().getChildFile ("build/test-settings-scratch");
+    scratch.deleteRecursively();
+    scratch.createDirectory();
+    scratch.getChildFile ("settings.xml").replaceWithText ("this is not xml");
+
+    check (loadNoteMapSetting (scratch) == NoteMap::generalMidi,
+           "a corrupt settings file falls back to General MIDI");
+
+    check (saveNoteMapSetting (NoteMap::beatStepPro, scratch), "settings can be written");
+    check (loadNoteMapSetting (scratch) == NoteMap::beatStepPro, "and read back");
+    check (saveNoteMapSetting (NoteMap::generalMidi, scratch), "and overwritten");
+    check (loadNoteMapSetting (scratch) == NoteMap::generalMidi, "with the new value");
+
+    scratch.deleteRecursively();
+
+    // Leave the suite's own override on General MIDI for any later test.
+    processor.setNoteMap (NoteMap::generalMidi);
+}
+
 } // namespace
 
 int main()
 {
+    // Nothing in this suite may touch the settings of whoever is running it.
+    auto settingsDirectory = juce::File::getCurrentWorkingDirectory()
+                                 .getChildFile ("build/test-settings");
+    settingsDirectory.deleteRecursively();
+    setSettingsDirectoryOverride (settingsDirectory);
+
     juce::ScopedJuceInitialiser_GUI juceInitialiser;
 
     std::cout << "DrumForge verification suite\n"
@@ -1449,9 +1560,13 @@ int main()
     testKitDynamics();
     testKitLibrary();
     testRandomiser();
+    testNoteMapOptions();
 
     std::cout << "\n============================\n"
               << passed << " passed, " << failed << " failed\n";
+
+    setSettingsDirectoryOverride ({});
+    settingsDirectory.deleteRecursively();
 
     return failed == 0 ? 0 : 1;
 }

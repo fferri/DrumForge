@@ -68,6 +68,14 @@ void PadButton::paint (juce::Graphics& g)
 
 void PadButton::mouseDown (const juce::MouseEvent& event)
 {
+    if (event.mods.isPopupMenu())
+    {
+        if (onContextMenu != nullptr)
+            onContextMenu();
+
+        return;
+    }
+
     pressed = true;
     glow = 1.0f;
 
@@ -143,6 +151,14 @@ TrackStrip::TrackStrip (DrumKitProcessor& owner, int index, EditorUiState& state
     driveKnob = makeKnob (pid::drive, ModTarget::drive);
     sendKnob  = makeKnob (pid::send,  ModTarget::send);
 
+    if (const auto map = processor.getNoteMap(); map != displayedNoteMap)
+    {
+        displayedNoteMap = map;
+        noteLabel = juce::MidiMessage::getMidiNoteName (primaryNoteForTrack (trackIndex, map), true, true, 3)
+                      + "  " + juce::String (primaryNoteForTrack (trackIndex, map));
+        repaint();
+    }
+
     for (auto* knob : { decayKnob.get(), toneKnob.get(), characterKnob.get(), sweepKnob.get(),
                         tuneKnob.get(), levelKnob.get(), panKnob.get(), driveKnob.get(), sendKnob.get() })
         addAndMakeVisible (*knob);
@@ -185,8 +201,15 @@ TrackStrip::TrackStrip (DrumKitProcessor& owner, int index, EditorUiState& state
     };
     addAndMakeVisible (randomiseButton);
 
-    noteLabel = juce::MidiMessage::getMidiNoteName (primaryNoteForTrack (trackIndex), true, true, 3)
-                  + "  " + juce::String (primaryNoteForTrack (trackIndex));
+    displayedNoteMap = processor.getNoteMap();
+    noteLabel = juce::MidiMessage::getMidiNoteName (primaryNoteForTrack (trackIndex, displayedNoteMap), true, true, 3)
+                  + "  " + juce::String (primaryNoteForTrack (trackIndex, displayedNoteMap));
+
+    pad.onContextMenu = [this]
+    {
+        if (onPadContextMenu != nullptr)
+            onPadContextMenu();
+    };
 
     displayedModel = processor.getSelectedModel (trackIndex);
     updateModelDependentUi();

@@ -40,6 +40,13 @@ DrumKitEditor::DrumKitEditor (DrumKitProcessor& owner)
     for (int t = 0; t < kNumTracks; ++t)
     {
         strips[(size_t) t] = std::make_unique<TrackStrip> (kit(), t, uiState);
+
+        // Right-clicking a pad is where a player looks for MIDI settings, so it offers the
+        // note map directly rather than only in the kit menu.
+        strips[(size_t) t]->onPadContextMenu = [this, t]
+        {
+            showNoteMapMenu (strips[(size_t) t].get());
+        };
         addAndMakeVisible (*strips[(size_t) t]);
     }
 
@@ -183,6 +190,13 @@ void DrumKitEditor::showKitMenu()
     menu.addSeparator();
     menu.addItem (1, "Save current settings as a kit...");
 
+    juce::PopupMenu noteMaps;
+    for (int i = 0; i < kNumNoteMaps; ++i)
+        noteMaps.addItem (3000 + i, noteMapName ((NoteMap) i), true,
+                          (int) kit().getNoteMap() == i);
+
+    menu.addSubMenu ("MIDI note map", noteMaps);
+
     if (! library.isFactoryKit (currentKitIndex))
     {
         menu.addSeparator();
@@ -197,6 +211,13 @@ void DrumKitEditor::showKitMenu()
 
 void DrumKitEditor::handleKitMenuResult (int result)
 {
+    if (result >= 3000)
+    {
+        kit().setNoteMap ((NoteMap) (result - 3000));
+        repaint();
+        return;
+    }
+
     if (result >= 1000)
     {
         loadKit (result - 1000);
@@ -212,6 +233,24 @@ void DrumKitEditor::handleKitMenuResult (int result)
         case 3:  deleteCurrentKit();  break;
         default: break;
     }
+}
+
+void DrumKitEditor::showNoteMapMenu (juce::Component* target)
+{
+    juce::PopupMenu menu;
+
+    for (int i = 0; i < kNumNoteMaps; ++i)
+        menu.addItem (3000 + i, noteMapName ((NoteMap) i), true, (int) kit().getNoteMap() == i);
+
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (target),
+                        [this] (int result)
+                        {
+                            if (result >= 3000)
+                            {
+                                kit().setNoteMap ((NoteMap) (result - 3000));
+                                repaint();
+                            }
+                        });
 }
 
 void DrumKitEditor::loadKit (int index)

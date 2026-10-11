@@ -22,6 +22,7 @@ add_library(DrumForgeCore STATIC
     Source/Core/ModulationState.cpp
     Source/Core/Randomizer.cpp
     Source/Core/KitLibrary.cpp
+    Source/Core/Settings.cpp
     Source/Core/DrumKitProcessor.cpp
     Source/UI/Theme.cpp
     Source/UI/ModelKnob.cpp

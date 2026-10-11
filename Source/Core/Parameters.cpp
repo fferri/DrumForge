@@ -29,7 +29,7 @@ namespace
     };
 
     // General MIDI percussion key map, folded onto our eight tracks.
-    const NoteMapping noteMappings[kNumTracks]
+    const NoteMapping generalMidiMappings[kNumTracks]
     {
         { 36, { 35, 36 } },              // Bass drum 1 (and the acoustic bass drum)
         { 38, { 37, 38, 40 } },          // Acoustic snare, side stick, electric snare
@@ -40,6 +40,25 @@ namespace
         { 49, { 49, 52, 55, 57 } },      // Crash 1, china, splash, crash 2
         { 51, { 51, 53, 59 } }           // Ride 1, ride bell, ride 2
     };
+
+    // The BeatStep Pro's drum sequencer defaults, in pad order. These are the numbers a
+    // BeatStep actually sends, which is the whole point: nothing here is guessable from GM.
+    const NoteMapping beatStepProMappings[kNumTracks]
+    {
+        { 39, { 39 } },
+        { 37, { 37 } },
+        { 51, { 51 } },
+        { 52, { 52 } },
+        { 60, { 60 } },
+        { 66, { 66 } },
+        { 58, { 58 } },
+        { 83, { 83 } }
+    };
+
+    const NoteMapping* mappingsFor (NoteMap map) noexcept
+    {
+        return map == NoteMap::beatStepPro ? beatStepProMappings : generalMidiMappings;
+    }
 
     //==========================================================================
     // Factory kits.
@@ -153,15 +172,28 @@ int defaultModelForTrack (int trackIndex) noexcept
     return kitPreset (defaultKitIndex).tracks[std::clamp (trackIndex, 0, kNumTracks - 1)].model;
 }
 
-int primaryNoteForTrack (int trackIndex) noexcept
+const char* noteMapName (NoteMap map) noexcept
 {
-    return noteMappings[std::clamp (trackIndex, 0, kNumTracks - 1)].primaryNote;
+    switch (map)
+    {
+        case NoteMap::generalMidi: return "General MIDI";
+        case NoteMap::beatStepPro: return "BeatStep Pro";
+    }
+
+    return "?";
 }
 
-int trackForMidiNote (int midiNote) noexcept
+int primaryNoteForTrack (int trackIndex, NoteMap map) noexcept
 {
+    return mappingsFor (map)[std::clamp (trackIndex, 0, kNumTracks - 1)].primaryNote;
+}
+
+int trackForMidiNote (int midiNote, NoteMap map) noexcept
+{
+    const auto* mappings = mappingsFor (map);
+
     for (int t = 0; t < kNumTracks; ++t)
-        for (int alias : noteMappings[t].aliases)
+        for (int alias : mappings[t].aliases)
             if (alias == midiNote)
                 return t;
 

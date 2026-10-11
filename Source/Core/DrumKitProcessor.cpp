@@ -1,6 +1,7 @@
 #include "DrumKitProcessor.h"
 
 #include "KitLibrary.h"
+#include "Settings.h"
 
 #include "UI/DrumKitEditor.h"
 
@@ -25,7 +26,21 @@ DrumKitProcessor::DrumKitProcessor()
         lastVelocity[(size_t) t].store (kNominalVelocity, std::memory_order_relaxed);
     }
 
+    // Preferences are global, so a new instance starts on whatever was chosen last.
+    noteMap.store ((int) loadNoteMapSetting(), std::memory_order_relaxed);
+
     reverb.setSampleRate (48000.0);
+}
+
+NoteMap DrumKitProcessor::getNoteMap() const noexcept
+{
+    return (NoteMap) noteMap.load (std::memory_order_relaxed);
+}
+
+void DrumKitProcessor::setNoteMap (NoteMap map)
+{
+    noteMap.store ((int) map, std::memory_order_relaxed);
+    saveNoteMapSetting (map);
 }
 
 void DrumKitProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
@@ -203,7 +218,7 @@ void DrumKitProcessor::handleMidiMessage (const juce::MidiMessage& message)
     if (! message.isNoteOn())
         return;
 
-    const int trackIndex = trackForMidiNote (message.getNoteNumber());
+    const int trackIndex = trackForMidiNote (message.getNoteNumber(), getNoteMap());
 
     if (trackIndex >= 0)
         triggerTrackInternal (trackIndex, message.getFloatVelocity());

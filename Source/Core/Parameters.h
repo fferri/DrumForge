@@ -101,14 +101,37 @@ int defaultKit() noexcept;
 /** Which engine each track ships with, following the GM drum map. */
 int defaultModelForTrack (int trackIndex) noexcept;
 
+/** Which set of MIDI note numbers the pads respond to.
+
+    General MIDI is the near-universal convention. A BeatStep Pro's drum sequencer sends its
+    own defaults instead, and the two maps genuinely collide - note 39 is a hand clap in GM
+    and the first pad on a BeatStep - so this is a choice between them rather than a union
+    of both.
+
+    The map is a property of the hardware in front of you, not of the song, so it is stored
+    as a global preference rather than in the session.
+*/
+enum class NoteMap
+{
+    generalMidi = 0,
+    beatStepPro
+};
+
+constexpr int kNumNoteMaps = 2;
+
+/** Human-readable name, for the menus. */
+const char* noteMapName (NoteMap map) noexcept;
+
 /** The MIDI note that triggers a track, and its neighbours. Used by the UI and by the
-    processor's note map. Index 0..7. */
-int primaryNoteForTrack (int trackIndex) noexcept;
+    processor's note map. Index 0..7. Defaults to General MIDI so that tools and tests that
+    do not care about the mapping can ignore it. */
+int primaryNoteForTrack (int trackIndex, NoteMap map = NoteMap::generalMidi) noexcept;
 
 /** Resolves a MIDI note to a track index, or -1 when the note is not a drum note. */
-int trackForMidiNote (int midiNote) noexcept;
+int trackForMidiNote (int midiNote, NoteMap map = NoteMap::generalMidi) noexcept;
 
-/** Closed hi-hat notes choke the open hi-hat track, as in General MIDI. */
+/** Closed hi-hat notes choke the open hi-hat track. Depends on the track, not on which
+    note triggered it, so the note map does not come into it. */
 int chokeGroupForTrack (int trackIndex) noexcept;
 
 juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();

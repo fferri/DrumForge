@@ -72,6 +72,11 @@ public:
     // Velocity modulation. Depths are deliberately not parameters, so they have their own
     // accessors rather than going through apvts.getParameter().
 
+    /** Which MIDI note map the pads respond to. Stored globally, not in the session: it
+        describes the hardware in front of you rather than the song. */
+    NoteMap getNoteMap() const noexcept;
+    void setNoteMap (NoteMap map);
+
     ModulationState& getModulationState() noexcept { return modulation; }
     const ModulationState& getModulationState() const noexcept { return modulation; }
 
@@ -128,6 +133,7 @@ private:
     std::array<std::atomic<float>, kNumTracks> lastVelocity;
 
     ModulationState modulation;
+    std::atomic<int> noteMap { (int) NoteMap::generalMidi };
 
     Rng triggerRng { 0x51ed2701u };
 
