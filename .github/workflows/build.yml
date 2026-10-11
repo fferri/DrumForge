@@ -167,6 +167,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
-            || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
-          gh release upload "$GITHUB_REF_NAME" $(find dist -name '*.zip') --clobber
+          # This job has no checkout, so there is no git remote for gh to infer the
+          # repository from, and every call has to name it explicitly.
+          trap 'report $LINENO' ERR
+          report() { echo "::error::release publish failed at line $1"; }
+          set -e
+
+          assets=$(find dist -name '*.zip')
+          echo "packages to attach:"
+          echo "$assets"
+
+          if [ -z "$assets" ]; then
+            echo "::error::no packages were downloaded from the build jobs"
+            exit 1
+          fi
+
+          if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+              --title "DrumForge $GITHUB_REF_NAME" --generate-notes
+          fi
+
+          gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber $assets
