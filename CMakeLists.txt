@@ -74,6 +74,11 @@ juce_add_console_app(DrumForgeRender PRODUCT_NAME "DrumForgeRender")
 target_sources(DrumForgeRender PRIVATE Tools/RenderDemo.cpp)
 target_link_libraries(DrumForgeRender PRIVATE DrumForgeCore juce::juce_audio_formats)
 
+# Kit design harness: renders .dfkit files through lane-matched patterns.
+juce_add_console_app(DrumForgeKitLab PRODUCT_NAME "DrumForgeKitLab")
+target_sources(DrumForgeKitLab PRIVATE Tools/KitLab.cpp)
+target_link_libraries(DrumForgeKitLab PRIVATE DrumForgeCore juce::juce_audio_formats)
+
 juce_add_console_app(DrumForgeTests PRODUCT_NAME "DrumForgeTests")
 target_sources(DrumForgeTests PRIVATE Tools/RenderTests.cpp)
 target_link_libraries(DrumForgeTests PRIVATE DrumForgeCore)

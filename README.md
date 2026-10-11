@@ -349,6 +349,12 @@ plugin survives the full host lifecycle — repeated `prepareToPlay`, `releaseRe
 between, sample-rate and buffer-size changes, and blocks larger or smaller than the
 prepared size.
 
+**`DrumForgeKitLab`** is the kit design harness, not shipped with the plugin. It writes
+the factory kits out as `.dfkit` and renders any `.dfkit` through a pattern matched to its
+lane (`IN-`, `ID-`, `EL-`, `AM-`), because crest factor depends as much on how many hits
+land per bar as on the kit itself. `scripts/kitmetrics.py` then measures the renders against
+the targets taken from the reference recordings.
+
 **`DrumForgeHostTest`** is the end-to-end check. It loads the built `.vst3` from disk
 through JUCE's real VST3 hosting code — the same path a DAW takes — and verifies the bus
 layout (no audio input, stereo output), MIDI input, parameter exposure, audio rendering,
