@@ -6,9 +6,16 @@ cmake-build-*/
 # Generated audio from DrumForgeRender
 renders/
 
+# Python bytecode from the kit design scripts
+__pycache__/
+*.pyc
+
 # Reference material for kit design. Third-party commercial recordings used only as
 # statistical targets - never imported into the plugin, and never committed.
 reference_samples/
+
+# Kit design output: the .dfkit files in kits/ are versioned (they are small, readable and
+# reviewable), but the rendered audio they produce is not.
 
 # JUCE is fetched separately; see README.md
 JUCE/

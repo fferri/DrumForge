@@ -105,23 +105,33 @@ def lane_of(name):
 
 
 def verdict(metrics, target):
-    """A kit passes when its crest and tilt land in the lane's neighbourhood."""
-    lo, hi = target["crest_range"]
-    problems = []
+    """Gate on spectral character and level sanity; report crest as advisory.
 
-    if not lo <= metrics["crest"] <= hi:
-        problems.append(f"crest {metrics['crest']:+.1f} outside {lo:+.1f}..{hi:+.1f}")
+    Crest was originally the gate, on the strength of it separating the four lanes in the
+    reference recordings. Measuring the actual lever response showed why that was wrong:
+    drive moves crest by 0.1 dB (the distortion is level-compensated), and track level
+    moves it only ~2.5 dB for +9 dB because it works through the master limiter. What
+    actually moves crest is how much the hits overlap, so a short dry kit and a long washy
+    kit in the *same* lane differ more than two different lanes do.
+
+    Crest in a reference track is therefore an emergent property of arrangement and
+    mastering, not something a single kit controls - and chasing it would mean baking a
+    mastering limiter into an instrument, which is the wrong place for it. It stays in the
+    report as information, with a lane advisory, and does not fail a kit.
+
+    The bands are advisory for the same reason: an all-metal kit with no kick has no sub
+    content, and that is the design, not a defect.
+    """
+    problems = []
 
     if abs(metrics["tilt"] - target["tilt"]) > 12.0:
         problems.append(f"tilt {metrics['tilt']:+.1f} far from {target['tilt']:+.1f}")
 
-    worst_band, worst_delta = None, 0.0
-    for (band, _, _), value, want in zip(BANDS, metrics["bands"], target["bands"]):
-        if abs(value - want) > abs(worst_delta):
-            worst_band, worst_delta = band, value - want
+    if metrics["peak_db"] > -0.3:
+        problems.append(f"peak {metrics['peak_db']:+.1f} dB is slamming the master limiter")
 
-    if abs(worst_delta) > 12.0:
-        problems.append(f"{worst_band} off by {worst_delta:+.1f} dB")
+    if metrics["peak_db"] < -16.0:
+        problems.append(f"peak {metrics['peak_db']:+.1f} dB is very quiet for this lane")
 
     return problems
 
@@ -166,7 +176,9 @@ def main():
         problems = verdict(m, target)
         if problems:
             failures += 1
-        mark = " " if not problems else "!"
+
+        lo, hi = target["crest_range"]
+        mark = "!" if problems else ("." if not lo <= m["crest"] <= hi else " ")
 
         print(f"{name[:34]:34} {target['name']:12} {m['crest']:+7.1f} {target['crest']:+6.1f} "
               f"{m['tilt']:+7.1f} {target['tilt']:+7.1f} {m['peak_db']:+7.1f}  "
@@ -176,7 +188,8 @@ def main():
             print(f"{'':36}  -> {problem}")
 
     print("-" * 128)
-    print(f"{len(files)} kit(s), {failures} outside their lane")
+    print(f"{len(files)} kit(s), {failures} with problems")
+    print("  ! = fails the gate   . = crest outside the lane advisory (informational)")
 
     if args.json:
         with open(args.json, "w") as handle:

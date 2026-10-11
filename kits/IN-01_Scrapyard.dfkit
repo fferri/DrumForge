@@ -1,0 +1,26 @@
+<DRUMFORGE_KIT name="IN-01 Scrapyard" version="1">
+  <TRACK index="0" model="0" dist="2" level="-6.0" pan="0.1" tune="0.0" decay="0.42" tone="0.46" character="0.62" sweep="0.72" drive="0.6" send="0.07">
+    <MOD target="Level" depth="0.1"/>
+  </TRACK>
+  <TRACK index="1" model="1" dist="1" level="-11.0" pan="0.18" tune="-12.0" decay="0.4" tone="0.52" character="0.7" sweep="0.45" drive="0.55" send="0.07">
+    <MOD target="Level" depth="0.1"/>
+  </TRACK>
+  <TRACK index="2" model="3" dist="4" level="-11.0" pan="0.12" tune="10.0" decay="0.14" tone="0.66" character="0.9" sweep="0.3" drive="0.55" send="0.07">
+    <MOD target="Level" depth="0.1"/>
+  </TRACK>
+  <TRACK index="3" model="3" dist="4" level="-11.0" pan="0.16" tune="14.0" decay="0.55" tone="0.6" character="0.88" sweep="0.24" drive="0.55" send="0.07">
+    <MOD target="Level" depth="0.1"/>
+  </TRACK>
+  <TRACK index="4" model="4" dist="2" level="-11.0" pan="-0.1" tune="-6.0" decay="0.42" tone="0.48" character="0.58" sweep="0.62" drive="0.55" send="0.07">
+    <MOD target="Level" depth="0.1"/>
+  </TRACK>
+  <TRACK index="5" model="8" dist="2" level="-11.0" pan="-0.2" tune="-5.0" decay="0.48" tone="0.28" character="0.6" sweep="0.58" drive="0.55" send="0.07">
+    <MOD target="Level" depth="0.1"/>
+  </TRACK>
+  <TRACK index="6" model="7" dist="1" level="-14.5" pan="0.14" tune="-3.0" decay="0.58" tone="0.58" character="0.8" sweep="0.48" drive="0.55" send="0.07">
+    <MOD target="Level" depth="0.1"/>
+  </TRACK>
+  <TRACK index="7" model="5" dist="4" level="-14.5" pan="0.18" tune="10.0" decay="0.62" tone="0.62" character="0.6" sweep="0.52" drive="0.55" send="0.07">
+    <MOD target="Level" depth="0.1"/>
+  </TRACK>
+</DRUMFORGE_KIT>

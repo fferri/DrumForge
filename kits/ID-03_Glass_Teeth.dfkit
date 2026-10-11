@@ -1,0 +1,26 @@
+<DRUMFORGE_KIT name="ID-03 Glass Teeth" version="1">
+  <TRACK index="0" model="0" dist="0" level="-6.5" pan="-0.12" tune="5.0" decay="0.2" tone="0.66" character="0.7" sweep="0.7" drive="0.16" send="0.2">
+    <MOD target="Level" depth="0.16"/>
+  </TRACK>
+  <TRACK index="1" model="4" dist="0" level="-10.5" pan="0.1" tune="7.0" decay="0.2" tone="0.74" character="0.72" sweep="0.66" drive="0.16" send="0.2">
+    <MOD target="Level" depth="0.16"/>
+  </TRACK>
+  <TRACK index="2" model="3" dist="0" level="-10.5" pan="0.18" tune="17.0" decay="0.07" tone="0.84" character="0.96" sweep="0.22" drive="0.16" send="0.2">
+    <MOD target="Level" depth="0.16"/>
+  </TRACK>
+  <TRACK index="3" model="3" dist="0" level="-10.5" pan="-0.16" tune="16.0" decay="0.28" tone="0.8" character="0.92" sweep="0.18" drive="0.16" send="0.2">
+    <MOD target="Level" depth="0.16"/>
+  </TRACK>
+  <TRACK index="4" model="7" dist="0" level="-10.5" pan="0.12" tune="16.0" decay="0.44" tone="0.78" character="0.9" sweep="0.52" drive="0.16" send="0.2">
+    <MOD target="Level" depth="0.16"/>
+  </TRACK>
+  <TRACK index="5" model="6" dist="0" level="-10.5" pan="-0.08" tune="17.0" decay="0.18" tone="0.76" character="0.68" sweep="0.8" drive="0.16" send="0.2">
+    <MOD target="Level" depth="0.16"/>
+  </TRACK>
+  <TRACK index="6" model="7" dist="0" level="-13.0" pan="0.2" tune="4.0" decay="0.62" tone="0.74" character="0.88" sweep="0.48" drive="0.16" send="0.2">
+    <MOD target="Level" depth="0.16"/>
+  </TRACK>
+  <TRACK index="7" model="5" dist="0" level="-13.0" pan="-0.14" tune="14.0" decay="0.58" tone="0.82" character="0.76" sweep="0.62" drive="0.16" send="0.2">
+    <MOD target="Level" depth="0.16"/>
+  </TRACK>
+</DRUMFORGE_KIT>

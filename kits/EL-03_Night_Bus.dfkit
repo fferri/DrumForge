@@ -1,0 +1,26 @@
+<DRUMFORGE_KIT name="EL-03 Night Bus" version="1">
+  <TRACK index="0" model="0" dist="0" level="-6.0" pan="-0.05" tune="-7.0" decay="0.62" tone="0.3" character="0.54" sweep="0.68" drive="0.24" send="0.22">
+    <MOD target="Level" depth="0.14"/>
+  </TRACK>
+  <TRACK index="1" model="1" dist="0" level="-10.0" pan="0.12" tune="-5.0" decay="0.46" tone="0.4" character="0.54" sweep="0.36" drive="0.24" send="0.22">
+    <MOD target="Level" depth="0.14"/>
+  </TRACK>
+  <TRACK index="2" model="8" dist="0" level="-10.0" pan="-0.1" tune="-5.0" decay="0.58" tone="0.26" character="0.58" sweep="0.52" drive="0.24" send="0.22">
+    <MOD target="Level" depth="0.14"/>
+  </TRACK>
+  <TRACK index="3" model="4" dist="0" level="-10.0" pan="0.15" tune="10.0" decay="0.44" tone="0.44" character="0.48" sweep="0.6" drive="0.24" send="0.22">
+    <MOD target="Level" depth="0.14"/>
+  </TRACK>
+  <TRACK index="4" model="2" dist="0" level="-10.0" pan="-0.14" tune="-9.0" decay="0.52" tone="0.38" character="0.5" sweep="0.34" drive="0.24" send="0.22">
+    <MOD target="Level" depth="0.14"/>
+  </TRACK>
+  <TRACK index="5" model="3" dist="0" level="-10.0" pan="0.18" tune="9.0" decay="0.12" tone="0.5" character="0.78" sweep="0.26" drive="0.24" send="0.22">
+    <MOD target="Level" depth="0.14"/>
+  </TRACK>
+  <TRACK index="6" model="7" dist="0" level="-12.5" pan="-0.08" tune="-3.0" decay="0.56" tone="0.44" character="0.68" sweep="0.46" drive="0.24" send="0.22">
+    <MOD target="Level" depth="0.14"/>
+  </TRACK>
+  <TRACK index="7" model="5" dist="0" level="-12.5" pan="0.1" tune="12.0" decay="0.64" tone="0.46" character="0.62" sweep="0.54" drive="0.24" send="0.22">
+    <MOD target="Level" depth="0.14"/>
+  </TRACK>
+</DRUMFORGE_KIT>

@@ -1,0 +1,26 @@
+<DRUMFORGE_KIT name="EL-04 Paper Cup" version="1">
+  <TRACK index="0" model="0" dist="0" level="-6.0" pan="-0.05" tune="5.0" decay="0.18" tone="0.56" character="0.6" sweep="0.6" drive="0.24" send="0.22">
+    <MOD target="Level" depth="0.14"/>
+  </TRACK>
+  <TRACK index="1" model="4" dist="0" level="-10.0" pan="0.12" tune="0.0" decay="0.14" tone="0.62" character="0.52" sweep="0.62" drive="0.24" send="0.22">
+    <MOD target="Level" depth="0.14"/>
+  </TRACK>
+  <TRACK index="2" model="3" dist="0" level="-10.0" pan="-0.1" tune="21.0" decay="0.06" tone="0.72" character="0.86" sweep="0.22" drive="0.24" send="0.22">
+    <MOD target="Level" depth="0.14"/>
+  </TRACK>
+  <TRACK index="3" model="3" dist="0" level="-10.0" pan="0.15" tune="21.0" decay="0.22" tone="0.68" character="0.82" sweep="0.2" drive="0.24" send="0.22">
+    <MOD target="Level" depth="0.14"/>
+  </TRACK>
+  <TRACK index="4" model="2" dist="0" level="-10.0" pan="-0.14" tune="12.0" decay="0.22" tone="0.6" character="0.48" sweep="0.3" drive="0.24" send="0.22">
+    <MOD target="Level" depth="0.14"/>
+  </TRACK>
+  <TRACK index="5" model="1" dist="0" level="-10.0" pan="0.18" tune="12.0" decay="0.2" tone="0.58" character="0.56" sweep="0.34" drive="0.24" send="0.22">
+    <MOD target="Level" depth="0.14"/>
+  </TRACK>
+  <TRACK index="6" model="7" dist="0" level="-12.5" pan="-0.08" tune="20.0" decay="0.3" tone="0.64" character="0.7" sweep="0.42" drive="0.24" send="0.22">
+    <MOD target="Level" depth="0.14"/>
+  </TRACK>
+  <TRACK index="7" model="5" dist="0" level="-12.5" pan="0.1" tune="22.0" decay="0.34" tone="0.68" character="0.62" sweep="0.58" drive="0.24" send="0.22">
+    <MOD target="Level" depth="0.14"/>
+  </TRACK>
+</DRUMFORGE_KIT>

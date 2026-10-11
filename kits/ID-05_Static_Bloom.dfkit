@@ -1,0 +1,26 @@
+<DRUMFORGE_KIT name="ID-05 Static Bloom" version="1">
+  <TRACK index="0" model="0" dist="0" level="-6.5" pan="-0.12" tune="-5.0" decay="0.34" tone="0.48" character="0.5" sweep="0.66" drive="0.16" send="0.2">
+    <MOD target="Level" depth="0.16"/>
+  </TRACK>
+  <TRACK index="1" model="8" dist="0" level="-10.5" pan="0.1" tune="-10.0" decay="0.72" tone="0.34" character="0.68" sweep="0.5" drive="0.16" send="0.2">
+    <MOD target="Level" depth="0.16"/>
+  </TRACK>
+  <TRACK index="2" model="7" dist="0" level="-10.5" pan="0.18" tune="11.0" decay="0.74" tone="0.56" character="0.82" sweep="0.54" drive="0.16" send="0.2">
+    <MOD target="Level" depth="0.16"/>
+  </TRACK>
+  <TRACK index="3" model="3" dist="0" level="-10.5" pan="-0.16" tune="3.0" decay="0.2" tone="0.7" character="0.88" sweep="0.3" drive="0.16" send="0.2">
+    <MOD target="Level" depth="0.16"/>
+  </TRACK>
+  <TRACK index="4" model="5" dist="0" level="-10.5" pan="0.12" tune="3.0" decay="0.84" tone="0.62" character="0.74" sweep="0.6" drive="0.16" send="0.2">
+    <MOD target="Level" depth="0.16"/>
+  </TRACK>
+  <TRACK index="5" model="6" dist="0" level="-10.5" pan="-0.08" tune="20.0" decay="0.56" tone="0.6" character="0.62" sweep="0.7" drive="0.16" send="0.2">
+    <MOD target="Level" depth="0.16"/>
+  </TRACK>
+  <TRACK index="6" model="7" dist="0" level="-13.0" pan="0.2" tune="-10.0" decay="0.66" tone="0.52" character="0.76" sweep="0.44" drive="0.16" send="0.2">
+    <MOD target="Level" depth="0.16"/>
+  </TRACK>
+  <TRACK index="7" model="5" dist="0" level="-13.0" pan="-0.14" tune="15.0" decay="0.88" tone="0.58" character="0.72" sweep="0.66" drive="0.16" send="0.2">
+    <MOD target="Level" depth="0.16"/>
+  </TRACK>
+</DRUMFORGE_KIT>

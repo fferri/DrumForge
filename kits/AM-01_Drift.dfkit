@@ -1,0 +1,26 @@
+<DRUMFORGE_KIT name="AM-01 Drift" version="1">
+  <TRACK index="0" model="2" dist="0" level="-4.0" pan="-0.3" tune="-5.0" decay="0.84" tone="0.44" character="0.5" sweep="0.44" drive="0.02" send="0.48">
+    <MOD target="Level" depth="0.12"/>
+  </TRACK>
+  <TRACK index="1" model="2" dist="0" level="-8.0" pan="0.25" tune="7.0" decay="0.76" tone="0.48" character="0.46" sweep="0.38" drive="0.02" send="0.48">
+    <MOD target="Level" depth="0.12"/>
+  </TRACK>
+  <TRACK index="2" model="8" dist="0" level="-8.0" pan="-0.2" tune="-7.0" decay="0.88" tone="0.34" character="0.56" sweep="0.5" drive="0.02" send="0.48">
+    <MOD target="Level" depth="0.12"/>
+  </TRACK>
+  <TRACK index="3" model="7" dist="0" level="-8.0" pan="0.3" tune="15.0" decay="0.82" tone="0.52" character="0.62" sweep="0.46" drive="0.02" send="0.48">
+    <MOD target="Level" depth="0.12"/>
+  </TRACK>
+  <TRACK index="4" model="5" dist="0" level="-8.0" pan="0.35" tune="17.0" decay="0.92" tone="0.58" character="0.66" sweep="0.58" drive="0.02" send="0.48">
+    <MOD target="Level" depth="0.12"/>
+  </TRACK>
+  <TRACK index="5" model="6" dist="0" level="-8.0" pan="-0.28" tune="18.0" decay="0.7" tone="0.54" character="0.52" sweep="0.56" drive="0.02" send="0.48">
+    <MOD target="Level" depth="0.12"/>
+  </TRACK>
+  <TRACK index="6" model="7" dist="0" level="-10.5" pan="0.22" tune="-13.0" decay="0.86" tone="0.5" character="0.6" sweep="0.42" drive="0.02" send="0.48">
+    <MOD target="Level" depth="0.12"/>
+  </TRACK>
+  <TRACK index="7" model="5" dist="0" level="-10.5" pan="-0.25" tune="12.0" decay="0.95" tone="0.54" character="0.64" sweep="0.62" drive="0.02" send="0.48">
+    <MOD target="Level" depth="0.12"/>
+  </TRACK>
+</DRUMFORGE_KIT>
