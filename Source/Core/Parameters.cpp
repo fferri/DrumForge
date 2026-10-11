@@ -68,56 +68,10 @@ namespace
     // Levels are trimmed so the engines' natural outputs land on a sensible
     // drum-kit balance rather than all sitting at the same fader position.
     //==========================================================================
+    // Generated from kits/*.dfkit by scripts/emit_factory_kits.py. Edit the kit files and
+    // re-run it; nothing in the included block is meant to be hand-edited.
     const KitPreset kitPresets[]
     {
-        // ---- Industrial: the default. Inharmonic tunings, wavefolding and
-        //      bit-crushing, plus the two engines built for aggression.
-        //      Levels sit ~4 dB below the pre-modulation values because a nominal
-        //      hit is now unity gain where it used to be attenuated. ------------
-        {
-            "Industrial",
-            {
-                { mKick,   dFold,    -4.0f,  0.00f,  0.0f, 0.72f, 0.50f, 0.50f, 0.70f, 0.55f, 0.06f, 0.10f },
-                { mSnare,  dHard,    -7.0f,  0.00f, -6.0f, 0.50f, 0.60f, 0.72f, 0.50f, 0.50f, 0.20f, 0.16f },
-                { mMetal,  dCrush,  -15.0f,  0.12f,  5.0f, 0.14f, 0.70f, 0.90f, 0.30f, 0.45f, 0.05f, 0.10f },
-                { mMetal,  dCrush,  -15.0f,  0.16f,  5.0f, 0.60f, 0.66f, 0.90f, 0.25f, 0.40f, 0.18f, 0.12f },
-                { mClap,   dFold,   -11.0f, -0.15f,  0.0f, 0.45f, 0.50f, 0.55f, 0.60f, 0.45f, 0.35f, 0.14f },
-                { mRumble, dFold,   -10.0f, -0.25f,  0.0f, 0.45f, 0.30f, 0.55f, 0.60f, 0.55f, 0.15f, 0.10f },
-                { mClang,  dHard,   -16.0f, -0.20f,  0.0f, 0.60f, 0.60f, 0.78f, 0.50f, 0.35f, 0.30f, 0.14f },
-                { mCymbal, dCrush,  -17.0f,  0.20f,  0.0f, 0.60f, 0.66f, 0.60f, 0.55f, 0.35f, 0.22f, 0.10f }
-            }
-        },
-
-        // ---- Warehouse: tougher than Studio but still musical. --------------
-        {
-            "Warehouse",
-            {
-                { mKick,     dHard,  -4.0f,  0.00f, 0.0f, 0.42f, 0.40f, 0.58f, 0.62f, 0.35f, 0.03f, 0.12f },
-                { mSnare,    dHard,  -7.0f,  0.00f, 0.0f, 0.40f, 0.55f, 0.60f, 0.35f, 0.30f, 0.16f, 0.16f },
-                { mMetal,    dSoft, -14.0f,  0.14f, 0.0f, 0.13f, 0.60f, 0.85f, 0.25f, 0.20f, 0.05f, 0.14f },
-                { mMetal,    dSoft, -13.0f,  0.18f, 0.0f, 0.58f, 0.58f, 0.85f, 0.18f, 0.20f, 0.15f, 0.14f },
-                { mClap,     dSoft,  -9.0f, -0.12f, 0.0f, 0.42f, 0.45f, 0.45f, 0.55f, 0.25f, 0.30f, 0.14f },
-                { mMembrane, dFuzz,  -9.0f, -0.22f, 3.0f, 0.38f, 0.45f, 0.62f, 0.30f, 0.30f, 0.12f, 0.16f },
-                { mCymbal,   dSoft, -12.0f, -0.16f, 0.0f, 0.60f, 0.60f, 0.55f, 0.62f, 0.10f, 0.26f, 0.12f },
-                { mFmPerc,   dSoft, -14.0f,  0.22f, 7.0f, 0.30f, 0.60f, 0.35f, 0.35f, 0.20f, 0.18f, 0.14f }
-            }
-        },
-
-        // ---- Studio: the original clean, sample-free kit. ------------------
-        {
-            "Studio",
-            {
-                { mKick,     dSoft,  -4.0f,  0.00f, 0.0f, 0.45f, 0.35f, 0.55f, 0.62f, 0.18f, 0.03f, 0.12f },
-                { mSnare,    dSoft,  -6.0f,  0.00f, 0.0f, 0.42f, 0.55f, 0.58f, 0.35f, 0.22f, 0.18f, 0.18f },
-                { mMetal,    dSoft, -13.0f,  0.14f, 0.0f, 0.13f, 0.60f, 0.85f, 0.25f, 0.10f, 0.05f, 0.12f },
-                { mMetal,    dSoft, -12.0f,  0.18f, 0.0f, 0.60f, 0.58f, 0.85f, 0.18f, 0.10f, 0.16f, 0.14f },
-                { mClap,     dSoft,  -8.0f, -0.12f, 0.0f, 0.42f, 0.45f, 0.45f, 0.55f, 0.16f, 0.35f, 0.16f },
-                { mMembrane, dSoft,  -8.5f, -0.22f, 3.0f, 0.38f, 0.45f, 0.55f, 0.30f, 0.10f, 0.15f, 0.18f },
-                { mCymbal,   dSoft, -11.0f, -0.16f, 0.0f, 0.60f, 0.60f, 0.55f, 0.62f, 0.05f, 0.30f, 0.12f },
-                { mCymbal,   dSoft, -13.0f,  0.22f, 0.0f, 0.66f, 0.68f, 0.28f, 0.30f, 0.05f, 0.22f, 0.12f }
-            }
-        },
-
 #include "FactoryKits.inc"
     };
 

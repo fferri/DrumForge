@@ -22,6 +22,7 @@
 #include <juce_audio_formats/juce_audio_formats.h>
 
 #include "Core/DrumKitProcessor.h"
+#include "Core/Settings.h"
 #include "Core/KitLibrary.h"
 #include "Core/Randomizer.h"
 
@@ -83,6 +84,17 @@ std::vector<Lane> buildLanes()
         { 7, 0, 0.35f },
     } };
 
+    // Techno: a straight four-on-the-floor, denser and more driving than electronica.
+    Lane techno { "TE", "techno", 134.0, 4, {
+        { 0, 0, 1.00f }, { 0, 4, 1.00f }, { 0, 8, 1.00f }, { 0, 12, 1.00f },
+        { 1, 4, 0.85f }, { 1, 12, 0.85f },
+        { 2, 2, 0.60f }, { 2, 6, 0.65f }, { 2, 10, 0.60f }, { 2, 14, 0.65f },
+        { 3, 14, 0.55f },
+        { 4, 12, 0.70f },
+        { 5, 0, 0.55f },
+        { 7, 8, 0.40f },
+    } };
+
     // Ambient: sparse, slow and quiet. The kit is a texture, not a groove, and nothing
     // should reach the limiter.
     Lane ambient { "AM", "ambient", 88.0, 4, {
@@ -95,7 +107,7 @@ std::vector<Lane> buildLanes()
         { 7, 10, 0.32f },
     } };
 
-    return { industrial, idm, electronica, ambient };
+    return { industrial, idm, electronica, techno, ambient };
 }
 
 const Lane* findLane (const std::vector<Lane>& lanes, const juce::String& kitName)
@@ -320,7 +332,7 @@ int doRender (const juce::File& kitDirectory, const juce::File& outputDirectory)
 
         DrumKitProcessor processor;
         processor.prepareToPlay (sampleRate, blockSize);
-        applyKit (processor, kit, DepthPolicy::replaceAll);
+        applyKit (processor, kit);
 
         const auto audio = renderEvents (processor, events, seconds);
         const auto out = outputDirectory.getChildFile (safeName (kit.name) + ".wav");
@@ -350,6 +362,13 @@ int doRender (const juce::File& kitDirectory, const juce::File& outputDirectory)
 int main (int argc, char** argv)
 {
     juce::ScopedJuceInitialiser_GUI juceInit;
+
+    // Tools must not pick up the preferences of whoever runs them. These build their note
+    // events from General MIDI numbers, so a BeatStep preference here would silently ignore
+    // most of them and the results would depend on the machine.
+    setSettingsDirectoryOverride (juce::File::getCurrentWorkingDirectory()
+                                      .getChildFile ("build/tool-settings"));
+
 
     const juce::StringArray arguments (argv, argc);
 

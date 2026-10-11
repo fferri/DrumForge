@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<DRUMFORGE_KIT name="TE-02 Hard Techno" version="1">
+  <TRACK index="0" model="0" dist="4" level="-3.999999046325684" pan="-0.3300000131130219"
+         tune="2.359999418258667" decay="0.6410000324249268" tone="0.5670000314712524"
+         character="0.8810000419616699" sweep="0.5800000429153442" drive="0.2600000202655792"
+         send="0.2840000092983246">
+    <MOD target="Character" depth="0.08388568460941315"/>
+    <MOD target="Level" depth="0.1109858080744743"/>
+  </TRACK>
+  <TRACK index="1" model="1" dist="2" level="-6.699999332427979" pan="0.3199999630451202"
+         tune="6.999999523162842" decay="0.4070000052452087" tone="0.6010000109672546"
+         character="0.7400000095367432" sweep="0.5040000081062317" drive="0.5590000152587891"
+         send="0.4220000207424164">
+    <MOD target="Decay" depth="0.1857015192508698"/>
+    <MOD target="Character" depth="0.07556726038455963"/>
+    <MOD target="Level" depth="0.1118177175521851"/>
+  </TRACK>
+  <TRACK index="2" model="3" dist="4" level="-2.099999189376831" pan="0.2999999821186066"
+         tune="9.999999046325684" decay="0.3740000128746033" tone="0.8450000286102295"
+         character="0.9020000696182251" sweep="0.1730000078678131" drive="0.3740000128746033"
+         send="0.04500000178813934">
+    <MOD target="Decay" depth="0.2166666686534882"/>
+    <MOD target="Character" depth="0.2813002467155457"/>
+    <MOD target="Level" depth="0.02108515799045563"/>
+  </TRACK>
+  <TRACK index="3" model="2" dist="3" level="-11.09999942779541" pan="0.3899999558925629"
+         tune="-2.660000562667847" decay="0.367000013589859" tone="0.378000020980835"
+         character="0.2650000154972076" sweep="0.1550000011920929" drive="0.8680000305175781"
+         send="0.3380000293254852">
+    <MOD target="Tone" depth="0.05105388164520264"/>
+    <MOD target="Character" depth="0.2678897082805634"/>
+    <MOD target="Level" depth="0.1134611740708351"/>
+  </TRACK>
+  <TRACK index="4" model="4" dist="0" level="-10.39999961853027" pan="0.3699999749660492"
+         tune="-5.000000476837158" decay="0.5360000133514404" tone="0.5670000314712524"
+         character="0.2280000150203705" sweep="0.893000066280365" drive="0.3260000050067902"
+         send="0.2000000029802322">
+    <MOD target="Decay" depth="0.1167943403124809"/>
+    <MOD target="Tone" depth="0.167030856013298"/>
+    <MOD target="Character" depth="0.1874975115060806"/>
+    <MOD target="Level" depth="0.1406608074903488"/>
+  </TRACK>
+  <TRACK index="5" model="8" dist="4" level="-9.999999046325684" pan="0.09999997913837433"
+         tune="0.2099994570016861" decay="0.5330000519752502" tone="0.300000011920929"
+         character="0.3760000169277191" sweep="0.1920000016689301" drive="0.6360000371932983"
+         send="0.00800000037997961">
+    <MOD target="Decay" depth="0.1433441787958145"/>
+    <MOD target="Character" depth="0.1098297238349915"/>
+    <MOD target="Level" depth="0.1126617193222046"/>
+  </TRACK>
+  <TRACK index="6" model="7" dist="1" level="-26.79999923706055" pan="0.1399999707937241"
+         tune="-5.364418029785156e-7" decay="0.2780000269412994" tone="0.02200000174343586"
+         character="0.6360000371932983" sweep="0.4720000326633453" drive="0.9350000619888306"
+         send="0.7920000553131104">
+    <MOD target="Decay" depth="0.1265568733215332"/>
+    <MOD target="Character" depth="-0.1222222149372101"/>
+    <MOD target="Sweep" depth="0.5833333134651184"/>
+    <MOD target="Level" depth="0.1114486083388329"/>
+  </TRACK>
+  <TRACK index="7" model="5" dist="4" level="-13.49999904632568" pan="-0.3900000154972076"
+         tune="6.999999523162842" decay="0.3500000238418579" tone="0.7070000171661377"
+         character="0.5660000443458557" sweep="0.0390000008046627" drive="0.4480000138282776"
+         send="0.4240000247955322">
+    <MOD target="Decay" depth="0.1419668644666672"/>
+    <MOD target="Tone" depth="0.1658966094255447"/>
+    <MOD target="Level" depth="0.05098157376050949"/>
+  </TRACK>
+</DRUMFORGE_KIT>

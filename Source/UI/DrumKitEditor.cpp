@@ -259,15 +259,13 @@ void DrumKitEditor::loadKit (int index)
 
     if (library.isFactoryKit (index))
     {
-        // levelOnly, so a built-in kit sets the dynamics but leaves the tone depths you
-        // have dialled alone.
         kit().applyKitPreset (index);
         lastSeenKitParameter = index;
     }
     else
     {
         // A kit you saved is a complete snapshot, so every depth comes back with it.
-        applyKit (kit(), library.getKit (index), DepthPolicy::replaceAll);
+        applyKit (kit(), library.getKit (index));
     }
 
     currentKitIndex = index;

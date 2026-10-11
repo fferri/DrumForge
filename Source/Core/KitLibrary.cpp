@@ -40,7 +40,7 @@ KitData captureKit (DrumKitProcessor& processor, const juce::String& name)
     return kit;
 }
 
-void applyKit (DrumKitProcessor& processor, const KitData& kit, DepthPolicy policy)
+void applyKit (DrumKitProcessor& processor, const KitData& kit)
 {
     for (int t = 0; t < kNumTracks; ++t)
     {
@@ -59,16 +59,8 @@ void applyKit (DrumKitProcessor& processor, const KitData& kit, DepthPolicy poli
         setParameterValue (processor.apvts, id (pid::drive),     track.drive);
         setParameterValue (processor.apvts, id (pid::send),      track.send);
 
-        if (policy == DepthPolicy::replaceAll)
-        {
-            for (int i = 0; i < kNumModTargets; ++i)
-                processor.setModulationDepth (t, i, track.depths[(size_t) i]);
-        }
-        else
-        {
-            processor.setModulationDepth (t, (int) ModTarget::level,
-                                          track.depths[(size_t) (int) ModTarget::level]);
-        }
+        for (int i = 0; i < kNumModTargets; ++i)
+            processor.setModulationDepth (t, i, track.depths[(size_t) i]);
     }
 }
 
@@ -105,9 +97,8 @@ KitData factoryKit (int index)
         track.drive     = source.drive;
         track.send      = source.send;
 
-        // A factory kit only carries a level depth; the depths on the tone and envelope
-        // knobs belong to the player, so they start at zero.
-        track.depths[(size_t) (int) ModTarget::level] = source.levelDepth;
+        for (int i = 0; i < kNumModTargets; ++i)
+            track.depths[(size_t) i] = source.depths[i];
     }
 
     return kit;

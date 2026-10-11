@@ -19,6 +19,7 @@
 #include <juce_events/juce_events.h>
 
 #include "Core/DrumKitProcessor.h"
+#include "Core/Settings.h"
 
 using namespace df;
 
@@ -212,6 +213,13 @@ void reportLevels (const juce::String& label, const juce::AudioBuffer<float>& bu
 int main (int argc, char** argv)
 {
     juce::ScopedJuceInitialiser_GUI juceInitialiser;
+
+    // Tools must not pick up the preferences of whoever runs them. These build their note
+    // events from General MIDI numbers, so a BeatStep preference here would silently ignore
+    // most of them and the results would depend on the machine.
+    setSettingsDirectoryOverride (juce::File::getCurrentWorkingDirectory()
+                                      .getChildFile ("build/tool-settings"));
+
 
     const juce::File outputDirectory = argc > 1
         ? juce::File::getCurrentWorkingDirectory().getChildFile (argv[1])

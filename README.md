@@ -1,12 +1,13 @@
 # DrumForge
 
-An 8-track drum and percussion **VST3 instrument** built with [JUCE](https://juce.com),
-tuned for industrial techno: inharmonic tunings, wavefolding and bit-crushing, sub drones
-and atonal metal, alongside the clean kit it started as.
+An 8-track drum and percussion **VST3 instrument** built with [JUCE](https://juce.com).
+Every one of the eight tracks can load any of **nine synthesis engines**, covering
+conventional drum synthesis through to inharmonic metal, wavefolding and sub drones. There
+are no samples anywhere in the plugin.
 
-Every one of the eight tracks can load any of **nine synthesis engines**. Tracks are
-triggered over MIDI using the General MIDI drum map, each track has its own drive, pan,
-level and reverb send, and there are no samples anywhere in the plugin.
+Tracks are triggered over MIDI using either the General MIDI drum map or an Arturia
+BeatStep Pro's note numbers. Each track has its own distortion curve, drive, tune, pan,
+level and reverb send, and every continuous parameter can be varied by velocity.
 
 ![DrumForge](docs/screenshot.png)
 
@@ -31,15 +32,15 @@ Each engine is a distinct synthesis technique, not a preset of the others.
 | 8 | **Clang** | Inharmonic FM ring-modulated against a third oscillator | Atonal struck metal, industrial percussion |
 | 9 | **Rumble** | Two detuned subs + a low-passed noise bed, up to 12 s | Kick tails, sub drones, tension beds |
 
-**Clang** is the dissonance engine. Its modulator and ring ratios move between
-√2, π, e and the golden ratio — never whole numbers — so its partials cannot line up with
-the fundamental however you tune it. The `Clang` knob slides those ratios further from
-consonance and raises the FM index, taking it from a struck bell to tearing sheet metal.
+**Clang** is the inharmonic engine. Its modulator and ring ratios move between √2, π, e and
+the golden ratio — never whole numbers — so its partials cannot align with the fundamental
+at any tuning. The `Clang` knob moves those ratios further from consonance and raises the FM
+index, from a struck bell towards torn metal.
 
-**Rumble** is the weight. Two sub oscillators a fraction of a percent apart beat slowly
-against each other, which is what gives industrial kick tails their uneasy movement.
-Decay reaches twelve seconds, so it doubles as a sustained bed. Push it through `Fold`
-drive and it becomes the wall of sound under the kit rather than a separate instrument.
+**Rumble** supplies low end. Two sub oscillators a fraction of a percent apart beat slowly
+against each other, which is what gives long kick tails their movement. Decay reaches twelve
+seconds, so it can also serve as a sustained bed. Through `Fold` drive it reads as part of
+the kit's body rather than a separate instrument.
 
 Every engine exposes the same four macro knobs, but each one **means something specific to
 that engine** — the UI relabels them live:
@@ -58,20 +59,19 @@ that engine** — the UI relabels them live:
 
 ---
 
-## Aggression: five distortion curves
+## Drive and five distortion curves
 
-Every track has a **Drive** amount and a **distortion curve** that shapes it. This is the
-main reason the kit can go from clean to hostile, and the curves are level-compensated, so
-turning Drive up changes the character rather than simply the loudness (measured spread
-across all five at full Drive: 0.8–1.1 dB).
+Every track has a **Drive** amount and a **distortion curve** that shapes it. The curves
+are level-compensated, so raising Drive changes the character rather than the loudness
+(measured spread across all five at full Drive: 0.8–1.1 dB).
 
 | Curve | What it does |
 |-------|--------------|
-| **Soft** | Symmetric `tanh`. Warm, the default, barely there until pushed |
+| **Soft** | Symmetric `tanh`. Warm, the default; subtle until pushed |
 | **Hard** | Hard clip. Crunchier odd harmonics, a blunt edge |
 | **Fold** | Wavefolder. Harmonics shift with level, so it sounds metallic and unstable |
 | **Fuzz** | Asymmetric `tanh`. Strong even harmonics, thick and dirty |
-| **Crush** | Bit reduction. Digital, aliased, deliberately cheap-sounding |
+| **Crush** | Bit reduction. Digital and aliased, by design |
 
 Drive at 0 is a true bypass whatever curve is selected.
 
@@ -83,8 +83,7 @@ Every continuous per-track parameter — the four macros plus `Tune`, `Level`, `
 and `Send` — can be swept by velocity. Each gets its own bipolar **depth**, so one knob can
 go from barely responsive to a full sweep in either direction.
 
-The curve is anchored at **velocity 100**, which is what most keyboards and pads send by
-default:
+The curve is anchored at **velocity 100**, the value most controllers send by default:
 
 | Velocity | Effect |
 |---|---|
@@ -101,12 +100,13 @@ note-on, so a ringing hit keeps the character it was struck with while other tra
 
 This replaced four hard-coded velocity responses that used to live inside the engines: a
 fixed loudness curve on all nine, plus velocity→brightness on Membrane and velocity→index on
-Clang and FM Perc. Those existed only on the engines where someone had thought to add them.
-Now all nine respond the same way, and you decide how much.
+Clang and FM Perc. Those were present only on the engines where they had been added
+individually. All nine now respond through the same path, with the amount under your
+control.
 
 Depths are deliberately **not** automation parameters. Automating a knob and automating
-velocity already spans the space — depth is only the slope between them, which is exactly
-the thing that should stay static. They are still saved with your session.
+velocity already spans the space; depth is only the slope between them, which is the part
+that should stay static. They are saved with your session, and with kits.
 
 ### Seeing and setting a depth
 
@@ -136,28 +136,30 @@ pans and sends — in one go. Every track stays editable afterwards.
 
 | Kit | Character |
 |-----|-----------|
-| **Industrial** (default) | Wavefolded kick, snare tuned a tritone from it, bit-crushed hats, Rumble on the tom slot and Clang on the crash slot. ~3.5 dB hotter RMS than Studio |
-| **Warehouse** | Hard-clipped kick and snare, fuzzed tom, FM Perc on the ride slot. Tough but still musical |
-| **Studio** | The original clean kit, so nothing was lost in the twist |
+| **Industrial** (default) | Wavefolded kick, snare tuned a tritone from it, bit-crushed hats, Rumble on the tom slot and Clang on the crash slot. About 2 dB higher RMS than Studio |
+| **Warehouse** | Hard-clipped kick and snare, fuzzed tom, FM Perc on the ride slot |
+| **Studio** | The original clean kit |
 
-Twenty more ship alongside them, designed against reference recordings and five per lane:
+Twenty-two more ship alongside them, five per lane plus two techno kits:
 
 | Lane | Kits |
 |---|---|
 | Industrial | Scrapyard, Furnace, Rivet Gun, Collapse, Concrete |
 | IDM | Sinew, Halflife, Glass Teeth, Dowel, Static Bloom |
 | Electronica | Cassette, Marimba Room, Night Bus, Paper Cup, Sodium |
+| Techno | Techno, Hard Techno |
 | Ambient | Drift, Ember, Glacier, Sediment, Tin Roof Rain |
 
-They live in `kits/*.dfkit` as editable text and are compiled into the binary by
+Every kit lives in `kits/*.dfkit` as editable text and is compiled into the binary by
 `scripts/emit_factory_kits.py`, which writes `Source/Core/FactoryKits.inc`. Edit a `.dfkit`
-and re-run the script; nothing generated should be hand-edited. The emitter refuses to
-compile a kit whose modulation the factory table cannot carry, rather than shipping one
-that would not sound the same as the file it came from.
+and re-run the script; the generated file is not meant to be hand-edited. Twenty of the kits
+come from `scripts/kitgen.py`, which holds their archetypes; the rest were authored directly
+as kit files.
 
-A kit also sets each track's **level depth**, because velocity dynamics are part of a kit's
-voicing — a machine-style kit and an acoustic one respond very differently. The depths on
-the tone and envelope knobs are the player's expression, so loading a kit leaves those alone.
+A kit carries **all nine modulation depths** for every track, not only the level depth, so a
+kit designed with velocity response on its tone or envelope knobs keeps it. The emitter
+rejects a kit using a modulation target it does not understand, rather than dropping it
+silently.
 
 ### Saving your own kits
 
@@ -172,11 +174,10 @@ up, and can be handed to someone else:
 velocity depth — so the format is diffable and hand-editable. Depths of zero are not
 written, which keeps the files readable.
 
-A saved kit is a **complete** snapshot: it restores every parameter *and* every modulation
-depth, so it sounds the same when it comes back. Factory kits are deliberately incomplete in
-that one respect — they set the engines, the values and the level depth, but leave the
-depths on the tone and envelope knobs alone. That difference is explicit in the code rather
-than accidental: `applyKit` takes a `DepthPolicy` and the two callers pass different values.
+A kit is a **complete** description of a sound: loading one restores every parameter *and*
+every modulation depth, for built-in and saved kits alike. It does not merge with whatever
+you already had dialled in — loading a kit replaces the current state, which is what makes
+it reproducible.
 
 Click the kit name in the header to browse. Built-in kits and your own appear in one list.
 
@@ -201,7 +202,7 @@ automation and browsing never fight.
 
 ## Track layout and MIDI
 
-The default kit follows the General MIDI percussion map:
+The default note map is the General MIDI percussion map:
 
 | Track | Primary note | Default engine (Industrial) | GM instrument |
 |-------|--------------|-----------------------------|---------------|
@@ -270,7 +271,8 @@ Source/
     ModulationState.*     per-parameter depths: saved with the session, not automatable
     KitLibrary.*          kits as data: capture, apply, XML, and the factory + user library
     DrumTrack.h           one track: engine hosting, per-track FX, metering
-    Parameters.h/.cpp     APVTS layout, GM note map, factory kits
+    Parameters.h/.cpp     APVTS layout, note maps, the factory kit table
+    FactoryKits.inc       generated: the kit table, from kits/*.dfkit
     DrumKitProcessor.*    the AudioProcessor: 8 tracks, MIDI, reverb bus, master
     Settings.*            global preferences (the note map), kept out of the session
   UI/
@@ -283,9 +285,9 @@ Source/
   PluginEntry.cpp         createPluginFilter()
 Tools/
   RenderDemo.cpp          offline WAV renderer
-  RenderTests.cpp         offline verification suite (412 checks)
+  RenderTests.cpp         offline verification suite (427 checks)
   RenderScreenshot.cpp    editor smoke test / screenshot generator
-  HostLoadTest.cpp        loads the built .vst3 through a real VST3 host (22 checks)
+  HostLoadTest.cpp        loads the built .vst3 through a real VST3 host (23 checks)
 ```
 
 Design points worth knowing:
@@ -307,10 +309,9 @@ Design points worth knowing:
   level/pan/drive/send.
 - **Master soft clipper** guarantees the output never exceeds full scale, however densely
   the kit is played.
-- **Randomising is constrained, not uniform.** The sweet-spot table in `Randomizer.cpp` is
-  the ranges the twenty factory kits actually live in. It is the difference between a
-  randomiser you leave installed and one you use twice. It also leaves the engine alone,
-  so the button varies the machine you chose rather than replacing it.
+- **Randomising is constrained, not uniform.** The sweet-spot table in `Randomizer.cpp`
+  holds the ranges each engine sounds usable in, taken from the factory kits. It also leaves
+  the engine alone, so the button varies the machine you chose rather than replacing it.
 - **Velocity enters the system in exactly one place.** The engines no longer read it at all;
   it reaches them only as already-modulated parameter values, which is what makes the
   behaviour adjustable instead of hard-coded.
@@ -344,13 +345,11 @@ carries a sweet-spot range per macro (a kick with no sweep is a click, rumble be
 0.4 is not rumble), tuning moves by musical intervals rather than freely so it cannot beat
 against the rest of the kit, and pan and send stay modest.
 
-**The engine is never rerolled.** Choosing an engine is the decision you make when you pick
-a track, and a button that silently replaced it would throw that away — the useful gesture
-is "vary the machine I have", not "replace it with a stranger".
+**The engine is never rerolled.** Choosing an engine is part of how you set a track up, and
+replacing it would discard that choice; the button varies the current machine.
 
-**Level, mute and solo are never touched either.** They are mix decisions, and randomising
-them would wreck the balance of the kit you are working in — the one change you cannot hear
-your way back from.
+**Level, mute and solo are never touched either.** They are mix decisions, and changing them
+would undo the balance of the kit you are working in.
 
 The top bar holds the **Kit** selector, the global `Master` level and the shared reverb
 (`Size`, `Damp`, `Mix`, `Width`). `Send` on each track feeds that reverb bus post-fader.
@@ -384,8 +383,8 @@ under the *Drum* category.
 
 ```sh
 cmake --build build
-./build/DrumForgeTests_artefacts/Release/DrumForgeTests              # 412 checks
-./build/DrumForgeHostTest_artefacts/Release/DrumForgeHostTest.app/Contents/MacOS/DrumForgeHostTest   # 22 checks
+./build/DrumForgeTests_artefacts/Release/DrumForgeTests              # 427 checks
+./build/DrumForgeHostTest_artefacts/Release/DrumForgeHostTest.app/Contents/MacOS/DrumForgeHostTest   # 23 checks
 ./build/DrumForgeScreenshot_artefacts/Release/DrumForgeScreenshot.app/Contents/MacOS/DrumForgeScreenshot docs/screenshot.png
 ./build/DrumForgeRender_artefacts/Release/DrumForgeRender renders    # writes WAVs you can listen to
 ```
@@ -400,13 +399,14 @@ plays inside full scale and still has a usable dynamic range; that the velocity 
 at 100, is symmetric and is monotonic; that depth 0 is an exact bypass at any velocity and a
 nominal hit is bit-identical whatever the depth; that modulation clamps rather than wraps;
 and that depths survive a session save while a session without them clears any leftovers;
-that a kit captures and restores every parameter and every depth while a factory kit leaves
-your tone depths alone; that the randomiser leaves level, mute and solo untouched across
+that a kit captures and restores every parameter and every depth, that all nine depths
+survive on all eight tracks of every factory kit, and that loading a kit replaces the depths
+rather than merging with yours; that the randomiser leaves level, mute and solo untouched across
 fifty rolls, never rerolls the engine across sixty rolls on each of the nine, never rolls an
 engine a value that stops it being itself, and produces finite audible output from thirty consecutive
 rolls; that kits survive XML and a round-trip through the filesystem, that
-re-saving replaces rather than duplicates, and that a name full of filename-hostile
-characters still works;
+re-saving replaces rather than duplicates, and that a name full of characters that are
+awkward in filenames still works;
 that the band the editor draws spans exactly the range the audio path applies, including on
 a skewed range; that both note maps resolve every pad back to its own track and ignore each other's notes,
 and that a new instance starts on the map last chosen, that the map travels with the
@@ -417,15 +417,15 @@ plugin survives the full host lifecycle — repeated `prepareToPlay`, `releaseRe
 between, sample-rate and buffer-size changes, and blocks larger or smaller than the
 prepared size.
 
-**`scripts/kitgen.py`** holds the twenty archetypes and regenerates `kits/*.dfkit`. It
-clamps every value to the parameter's real range and reports what it clamped, because a
-kit file stating a value the plugin would silently clamp is a file that lies about what
-plays.
+**`scripts/kitgen.py`** holds the archetypes for twenty of the kits and regenerates their
+`kits/*.dfkit` files. It clamps every value to the parameter's real range and reports what it
+clamped, because a kit file stating a value the plugin would silently clamp would not
+describe what actually plays.
 
 **`DrumForgeKitLab`** is the kit design harness, not shipped with the plugin. It writes
 the factory kits out as `.dfkit` and renders any `.dfkit` through a pattern matched to its
-lane (`IN-`, `ID-`, `EL-`, `AM-`), because crest factor depends as much on how many hits
-land per bar as on the kit itself. `scripts/kitmetrics.py` then measures the renders against
+lane (`IN-`, `ID-`, `EL-`, `TE-`, `AM-`), because crest factor depends as much on how many
+hits land per bar as on the kit itself. `scripts/kitmetrics.py` then measures the renders against
 the targets taken from the reference recordings.
 
 **`DrumForgeHostTest`** is the end-to-end check. It loads the built `.vst3` from disk
@@ -441,9 +441,12 @@ the headless tests cannot — but note that the *gestures* (rim drag, MOD drag, 
 have no automated coverage; only the maths behind them does.
 
 **`DrumForgeRender`** writes one isolated clean hit per engine, the same four-bar beat
-played through each factory kit (`kit_Industrial.wav`, `kit_Warehouse.wav`,
-`kit_Studio.wav` — the fastest way to hear the difference), and one bar per track of the
-default kit.
+played through each of the twenty-five factory kits (`kit_Industrial.wav` and so on, the
+quickest way to compare them), and one bar per track of the default kit.
+
+All the offline tools pin their settings directory before constructing a processor. They
+build their note events from General MIDI numbers, so picking up a user's BeatStep
+preference would silently ignore most of them and make the output depend on the machine.
 
 All four exit non-zero on failure and are safe to run in CI.
 
@@ -455,3 +458,21 @@ JUCE 9 is dual-licensed: **AGPLv3** or a commercial licence. This project links 
 subdirectory and is therefore distributed under the AGPLv3 unless you hold a commercial
 JUCE licence. If you plan to ship DrumForge as a closed-source product, you need the
 commercial licence from Raw Material Software.
+
+---
+
+## Supporting this project
+
+DrumForge is a vibe-coded project. It was built by describing what it should do, and the
+code, the kit design and this documentation were produced through that process. That is
+enough to arrive at a usable instrument, but it is not a substitute for the judgement of
+people who make music with it.
+
+If you would like to see it developed further — more engines, more kits, fewer rough edges —
+you can buy me a coffee. It sounds like a small gesture, but one coffee is roughly the
+number of tokens it takes to design, implement and verify another feature, so it converts
+fairly directly into more of the project:
+
+- **GitHub Sponsors** — <https://github.com/sponsors/fferri>
+
+Bug reports and feature requests are equally welcome and cost nothing.

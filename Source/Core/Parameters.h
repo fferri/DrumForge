@@ -75,17 +75,17 @@ struct GlobalParamRefs
 
 /** A complete kit: which engine each track runs, how it is driven and how it is set.
 
-    `levelDepth` is the only modulation depth a kit owns. Velocity dynamics are part of a
-    kit's voicing - a 909-ish kit and an acoustic one respond very differently - but the
-    depths on the tone and envelope knobs are the player's expression, so loading a kit
-    leaves those alone.
+    The depths array is in ModTarget order - decay, tone, character, sweep, tune, level,
+    drive, pan, send - and carries the *whole* velocity response. It used to hold only the
+    level depth, which meant a kit designed with modulation on the tone or envelope knobs
+    could not be shipped without silently losing it.
 */
 struct KitPresetTrack
 {
     int model;
     int distMode;
     float level, pan, tune, decay, tone, character, sweep, drive, send;
-    float levelDepth;
+    float depths[kNumModTargets];
 };
 
 struct KitPreset

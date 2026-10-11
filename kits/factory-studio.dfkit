@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<DRUMFORGE_KIT name="Studio" version="1">
+  <TRACK index="0" model="0" dist="0" level="-4.0" pan="0.0" tune="0.0"
+         decay="0.449999988079071" tone="0.3499999940395355" character="0.550000011920929"
+         sweep="0.6200000047683716" drive="0.1800000071525574" send="0.02999999932944775">
+    <MOD target="Level" depth="0.119999997317791"/>
+  </TRACK>
+  <TRACK index="1" model="1" dist="0" level="-6.0" pan="0.0" tune="0.0"
+         decay="0.4199999868869781" tone="0.550000011920929" character="0.5799999833106995"
+         sweep="0.3499999940395355" drive="0.2199999988079071" send="0.1800000071525574">
+    <MOD target="Level" depth="0.1800000071525574"/>
+  </TRACK>
+  <TRACK index="2" model="3" dist="0" level="-13.0" pan="0.1400000005960464"
+         tune="0.0" decay="0.1299999952316284" tone="0.6000000238418579"
+         character="0.8500000238418579" sweep="0.25" drive="0.1000000014901161"
+         send="0.05000000074505806">
+    <MOD target="Level" depth="0.119999997317791"/>
+  </TRACK>
+  <TRACK index="3" model="3" dist="0" level="-12.0" pan="0.1800000071525574"
+         tune="0.0" decay="0.6000000238418579" tone="0.5799999833106995"
+         character="0.8500000238418579" sweep="0.1800000071525574" drive="0.1000000014901161"
+         send="0.1599999964237213">
+    <MOD target="Level" depth="0.1400000005960464"/>
+  </TRACK>
+  <TRACK index="4" model="4" dist="0" level="-8.0" pan="-0.119999997317791"
+         tune="0.0" decay="0.4199999868869781" tone="0.449999988079071"
+         character="0.449999988079071" sweep="0.550000011920929" drive="0.1599999964237213"
+         send="0.3499999940395355">
+    <MOD target="Level" depth="0.1599999964237213"/>
+  </TRACK>
+  <TRACK index="5" model="2" dist="0" level="-8.5" pan="-0.2199999988079071"
+         tune="3.0" decay="0.3799999952316284" tone="0.449999988079071"
+         character="0.550000011920929" sweep="0.300000011920929" drive="0.1000000014901161"
+         send="0.1500000059604645">
+    <MOD target="Level" depth="0.1800000071525574"/>
+  </TRACK>
+  <TRACK index="6" model="5" dist="0" level="-11.0" pan="-0.1599999964237213"
+         tune="0.0" decay="0.6000000238418579" tone="0.6000000238418579"
+         character="0.550000011920929" sweep="0.6200000047683716" drive="0.05000000074505806"
+         send="0.300000011920929">
+    <MOD target="Level" depth="0.119999997317791"/>
+  </TRACK>
+  <TRACK index="7" model="5" dist="0" level="-13.0" pan="0.2199999988079071"
+         tune="0.0" decay="0.6600000262260437" tone="0.6800000071525574"
+         character="0.2800000011920929" sweep="0.300000011920929" drive="0.05000000074505806"
+         send="0.2199999988079071">
+    <MOD target="Level" depth="0.119999997317791"/>
+  </TRACK>
+</DRUMFORGE_KIT>

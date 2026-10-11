@@ -36,21 +36,14 @@ struct KitData
 /** Reads the processor's current state into a kit. Message thread only. */
 KitData captureKit (DrumKitProcessor& processor, const juce::String& name);
 
-/** What to do with the modulation depths when applying a kit.
+/** Writes a kit into the processor.
 
-    The two cases genuinely differ. A saved kit is a complete snapshot of a sound, so every
-    depth has to come back. A factory kit only ever carried a level depth, and the depths on
-    the tone and envelope knobs belong to the player, so loading one must not wipe them.
+    A kit is a complete description of a sound, so this sets every parameter *and* every
+    modulation depth. It used to have a mode that left the player's tone depths alone,
+    which existed only because the factory table could not carry them; now that it can,
+    partially applying a kit would just mean quietly losing whatever its author dialled in.
 */
-enum class DepthPolicy
-{
-    replaceAll,
-    levelOnly
-};
-
-/** Writes a kit into the processor. */
-void applyKit (DrumKitProcessor& processor, const KitData& kit,
-               DepthPolicy policy = DepthPolicy::replaceAll);
+void applyKit (DrumKitProcessor& processor, const KitData& kit);
 
 /** The built-in kits, converted from the factory tables on demand. */
 int numFactoryKits() noexcept;

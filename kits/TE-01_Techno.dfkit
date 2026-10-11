@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<DRUMFORGE_KIT name="TE-01 Techno" version="1">
+  <TRACK index="0" model="0" dist="2" level="-3.999999046325684" pan="-0.2700000107288361"
+         tune="3.109999418258667" decay="0.6570000052452087" tone="0.3630000054836273"
+         character="0.6580000519752502" sweep="0.4650000333786011" drive="0.1200000047683716"
+         send="0.174000009894371">
+    <MOD target="Decay" depth="0.1078819781541824"/>
+    <MOD target="Character" depth="0.2109077721834183"/>
+    <MOD target="Level" depth="0.07763633131980896"/>
+  </TRACK>
+  <TRACK index="1" model="1" dist="4" level="-6.699999332427979" pan="0.03999997675418854"
+         tune="-3.000000476837158" decay="0.1580000072717667" tone="0.7000000476837158"
+         character="0.4040000140666962" sweep="0.2780000269412994" drive="0.6430000066757202"
+         send="0.3470000028610229">
+    <MOD target="Tone" depth="0.1888547092676163"/>
+    <MOD target="Level" depth="0.1226576119661331"/>
+  </TRACK>
+  <TRACK index="2" model="3" dist="3" level="5.600000858306885" pan="0.01999997720122337"
+         tune="11.99999904632568" decay="0.3030000030994415" tone="0.5940000414848328"
+         character="0.8600000143051147" sweep="0.2720000147819519" drive="0.89000004529953"
+         send="0.04200000315904617">
+    <MOD target="Tone" depth="0.2127265483140945"/>
+    <MOD target="Level" depth="0.08381893485784531"/>
+  </TRACK>
+  <TRACK index="3" model="3" dist="2" level="-17.59999847412109" pan="-0.2000000178813934"
+         tune="-5.364418029785156e-7" decay="0.5" tone="0.581000030040741"
+         character="0.5230000019073486" sweep="0.9490000605583191" drive="0.6660000085830688"
+         send="0.2000000029802322">
+    <MOD target="Decay" depth="0.1929997950792313"/>
+    <MOD target="Character" depth="0.09609748423099518"/>
+    <MOD target="Level" depth="0.1761844307184219"/>
+  </TRACK>
+  <TRACK index="4" model="4" dist="3" level="-10.39999961853027" pan="-0.2700000107288361"
+         tune="-18.95000076293945" decay="0.7420000433921814" tone="0.6650000214576721"
+         character="0.5380000472068787" sweep="0.8100000619888306" drive="1.0"
+         send="0.4230000078678131">
+    <MOD target="Decay" depth="0.1856761574745178"/>
+    <MOD target="Tone" depth="0.0614033006131649"/>
+    <MOD target="Character" depth="0.1581566780805588"/>
+    <MOD target="Level" depth="0.1171813830733299"/>
+  </TRACK>
+  <TRACK index="5" model="8" dist="3" level="-9.999999046325684" pan="0.09999997913837433"
+         tune="-5.364418029785156e-7" decay="0.4360000193119049" tone="0.1940000057220459"
+         character="0.3430000245571136" sweep="0.8840000629425049" drive="1.0"
+         send="0.00800000037997961">
+    <MOD target="Decay" depth="0.1433441787958145"/>
+    <MOD target="Tone" depth="0.06749286502599716"/>
+    <MOD target="Character" depth="0.1098297238349915"/>
+    <MOD target="Level" depth="0.1126617193222046"/>
+  </TRACK>
+  <TRACK index="6" model="7" dist="1" level="-26.79999923706055" pan="0.1399999707937241"
+         tune="-5.364418029785156e-7" decay="0.4140000343322754" tone="0.02200000174343586"
+         character="0.8270000219345093" sweep="0.4720000326633453" drive="0.9350000619888306"
+         send="0.7920000553131104">
+    <MOD target="Decay" depth="0.1265568733215332"/>
+    <MOD target="Level" depth="0.1114486083388329"/>
+  </TRACK>
+  <TRACK index="7" model="5" dist="4" level="-17.0" pan="0.1999999731779099"
+         tune="-5.364418029785156e-7" decay="0.6000000238418579" tone="0.6600000262260437"
+         character="0.6000000238418579" sweep="0.550000011920929" drive="0.3500000238418579"
+         send="0.2200000137090683"/>
+</DRUMFORGE_KIT>

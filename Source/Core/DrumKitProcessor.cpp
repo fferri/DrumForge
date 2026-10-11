@@ -383,9 +383,7 @@ void DrumKitProcessor::applyKitPreset (int kitIndex)
 
     setParameterValue (apvts, pid::kit, (float) kitIndex);
 
-    // levelOnly: a factory kit sets the velocity dynamics but leaves the depths the player
-    // has dialled on the tone and envelope knobs alone.
-    applyKit (*this, factoryKit (kitIndex), DepthPolicy::levelOnly);
+    applyKit (*this, factoryKit (kitIndex));
 }
 
 juce::AudioProcessorEditor* DrumKitProcessor::createEditor()

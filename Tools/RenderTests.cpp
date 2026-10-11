@@ -1160,7 +1160,7 @@ void testKitLibrary()
 
     DrumKitProcessor restored;
     restored.prepareToPlay (sampleRate, blockSize);
-    applyKit (restored, captured, DepthPolicy::replaceAll);
+    applyKit (restored, captured);
 
     check (near (restored.getModulationDepth (3, (int) ModTarget::character), 0.42f),
            "apply restores a character depth");
@@ -1173,16 +1173,44 @@ void testKitLibrary()
              == (int) DistortionMode::fuzz,
            "apply restores the distortion curve");
 
-    // ---- levelOnly must not stomp the player's expression ------------------
+    // ---- a kit defines its modulation completely ---------------------------
+    // Loading used to leave any depth the kit did not specify alone. That made sense only
+    // while the factory table could carry nothing but a level depth; now a kit is a
+    // complete description and partially applying it would silently lose modulation.
     DrumKitProcessor expression;
     expression.prepareToPlay (sampleRate, blockSize);
     expression.setModulationDepth (1, (int) ModTarget::tone, 0.77f);
-    applyKit (expression, factoryKit (0), DepthPolicy::levelOnly);
+    applyKit (expression, factoryKit (0));
 
-    check (near (expression.getModulationDepth (1, (int) ModTarget::tone), 0.77f),
-           "a factory kit leaves the tone depths you dialled alone");
+    check (near (expression.getModulationDepth (1, (int) ModTarget::tone),
+                 factoryKit (0).tracks[1].depths[(size_t) (int) ModTarget::tone]),
+           "loading a kit replaces the depths rather than merging with yours",
+           juce::String (expression.getModulationDepth (1, (int) ModTarget::tone), 3));
     check (expression.getModulationDepth (0, (int) ModTarget::level) > 0.01f,
-           "but it does set the level depth, which is the kit's dynamics");
+           "and the kit's own dynamics come through");
+
+    // Every kit, every track, every depth - this is what stops a kit's modulation being
+    // quietly dropped on the way into the binary.
+    bool allDepthsRoundTrip = true;
+
+    for (int k = 0; k < numFactoryKits(); ++k)
+    {
+        DrumKitProcessor kitProcessor;
+        kitProcessor.prepareToPlay (sampleRate, blockSize);
+        kitProcessor.applyKitPreset (k);
+
+        const auto preset = factoryKit (k);
+
+        for (int t = 0; t < kNumTracks; ++t)
+            for (int i = 0; i < kNumModTargets; ++i)
+                allDepthsRoundTrip = allDepthsRoundTrip
+                    && std::abs (kitProcessor.getModulationDepth (t, i)
+                                   - preset.tracks[(size_t) t].depths[(size_t) i]) < 1.0e-4f;
+    }
+
+    check (allDepthsRoundTrip,
+           "every factory kit restores all nine depths on all eight tracks",
+           juce::String (numFactoryKits()) + " kits");
 
     // ---- XML round-trip ----------------------------------------------------
     const auto xml = kitToXml (captured);

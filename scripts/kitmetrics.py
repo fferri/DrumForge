@@ -47,6 +47,11 @@ LANE_TARGETS = {
                bands=[-11.4, -5.1, -5.4, -9.9, -10.7, -17.4]),
     "AM": dict(name="ambient", crest=19.5, crest_range=(16.5, 24.0), tilt=-19.0,
                bands=[-8.3, -7.7, -7.4, -6.3, -13.6, -19.0]),
+    # No techno recordings in the reference set, so this is a prior sitting between the
+    # industrial and electronica measurements rather than something measured. It exists to
+    # catch gross problems, not to judge the kits.
+    "TE": dict(name="techno", crest=11.5, crest_range=(7.5, 15.5), tilt=-22.0,
+               bands=[-10.0, -7.0, -7.0, -9.0, -11.0, -18.5]),
 }
 
 
