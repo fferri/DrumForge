@@ -452,12 +452,16 @@ All four exit non-zero on failure and are safe to run in CI.
 
 ---
 
-## Licensing note
+## Licensing
 
-JUCE 9 is dual-licensed: **AGPLv3** or a commercial licence. This project links JUCE as a
-subdirectory and is therefore distributed under the AGPLv3 unless you hold a commercial
-JUCE licence. If you plan to ship DrumForge as a closed-source product, you need the
-commercial licence from Raw Material Software.
+DrumForge is released under the **GNU Affero General Public License v3.0** (AGPLv3).
+
+The full licence text is at <https://www.gnu.org/licenses/agpl-3.0.html>.
+
+The plugin links [JUCE](https://juce.com), which is itself dual-licensed under the AGPLv3
+or a commercial licence. Distributing DrumForge under the AGPLv3 satisfies JUCE's terms;
+shipping it as a closed-source product would require a commercial JUCE licence from Raw
+Material Software.
 
 ---
 
