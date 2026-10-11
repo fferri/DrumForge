@@ -283,7 +283,7 @@ Source/
   PluginEntry.cpp         createPluginFilter()
 Tools/
   RenderDemo.cpp          offline WAV renderer
-  RenderTests.cpp         offline verification suite (406 checks)
+  RenderTests.cpp         offline verification suite (412 checks)
   RenderScreenshot.cpp    editor smoke test / screenshot generator
   HostLoadTest.cpp        loads the built .vst3 through a real VST3 host (22 checks)
 ```
@@ -384,7 +384,7 @@ under the *Drum* category.
 
 ```sh
 cmake --build build
-./build/DrumForgeTests_artefacts/Release/DrumForgeTests              # 406 checks
+./build/DrumForgeTests_artefacts/Release/DrumForgeTests              # 412 checks
 ./build/DrumForgeHostTest_artefacts/Release/DrumForgeHostTest.app/Contents/MacOS/DrumForgeHostTest   # 22 checks
 ./build/DrumForgeScreenshot_artefacts/Release/DrumForgeScreenshot.app/Contents/MacOS/DrumForgeScreenshot docs/screenshot.png
 ./build/DrumForgeRender_artefacts/Release/DrumForgeRender renders    # writes WAVs you can listen to
@@ -410,7 +410,8 @@ characters still works;
 that the band the editor draws spans exactly the range the audio path applies, including on
 a skewed range; that both note maps resolve every pad back to its own track and ignore each other's notes,
 and that a new instance starts on the map last chosen, that the map travels with the
-session, and that a corrupt settings file falls back to General MIDI; that the GM note map, the hi-hat choke group, mute, solo
+session, that the note shown in each track header follows a map change made while the
+editor is open, and that a corrupt settings file falls back to General MIDI; that the GM note map, the hi-hat choke group, mute, solo
 and the post-fader reverb send all behave; that state round-trips exactly; and that the
 plugin survives the full host lifecycle — repeated `prepareToPlay`, `releaseResources` in
 between, sample-rate and buffer-size changes, and blocks larger or smaller than the

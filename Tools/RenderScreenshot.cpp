@@ -14,6 +14,7 @@
 #include <juce_gui_extra/juce_gui_extra.h>
 
 #include "Core/DrumKitProcessor.h"
+#include "Core/Settings.h"
 
 using namespace df;
 
@@ -63,6 +64,12 @@ int main (int argc, char** argv)
     const juce::File outputFile = argc > 1
         ? juce::File::getCurrentWorkingDirectory().getChildFile (argv[1])
         : juce::File::getCurrentWorkingDirectory().getChildFile ("docs/screenshot.png");
+
+    // Deterministic: never read the preferences of whoever runs this, so the committed
+    // screenshot does not depend on which note map they happen to use. This has to come
+    // before the processor exists - the map's default is read in its constructor.
+    setSettingsDirectoryOverride (juce::File::getCurrentWorkingDirectory()
+                                      .getChildFile ("build/screenshot-settings"));
 
     DrumKitProcessor processor;
     processor.prepareToPlay (48000.0, 512);

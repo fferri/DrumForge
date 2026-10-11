@@ -66,6 +66,11 @@ public:
 
     int getTrackIndex() const noexcept { return trackIndex; }
 
+    /** The note caption in this track's header, as currently displayed. Exposed so the
+        editor can be asked what it is showing - the wiring from the note map to this
+        label is not something the audio tests can see. */
+    juce::String getNoteLabel() const { return noteLabel; }
+
 private:
     void updateModelDependentUi();
     void commitModelSelection (int modelIndex);

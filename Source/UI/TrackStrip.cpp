@@ -151,14 +151,6 @@ TrackStrip::TrackStrip (DrumKitProcessor& owner, int index, EditorUiState& state
     driveKnob = makeKnob (pid::drive, ModTarget::drive);
     sendKnob  = makeKnob (pid::send,  ModTarget::send);
 
-    if (const auto map = processor.getNoteMap(); map != displayedNoteMap)
-    {
-        displayedNoteMap = map;
-        noteLabel = juce::MidiMessage::getMidiNoteName (primaryNoteForTrack (trackIndex, map), true, true, 3)
-                      + "  " + juce::String (primaryNoteForTrack (trackIndex, map));
-        repaint();
-    }
-
     for (auto* knob : { decayKnob.get(), toneKnob.get(), characterKnob.get(), sweepKnob.get(),
                         tuneKnob.get(), levelKnob.get(), panKnob.get(), driveKnob.get(), sendKnob.get() })
         addAndMakeVisible (*knob);
@@ -264,6 +256,16 @@ void TrackStrip::updateFromProcessor()
     {
         displayedModel = model;
         updateModelDependentUi();
+    }
+
+    // The note number in the header has to follow the selected map. This belongs here, on
+    // the timer, not in the constructor - the map can change while the editor is open.
+    if (const auto map = processor.getNoteMap(); map != displayedNoteMap)
+    {
+        displayedNoteMap = map;
+        noteLabel = juce::MidiMessage::getMidiNoteName (primaryNoteForTrack (trackIndex, map), true, true, 3)
+                      + "  " + juce::String (primaryNoteForTrack (trackIndex, map));
+        repaint();
     }
 
     for (auto* knob : { decayKnob.get(), toneKnob.get(), characterKnob.get(), sweepKnob.get(),

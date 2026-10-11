@@ -43,10 +43,7 @@ DrumKitEditor::DrumKitEditor (DrumKitProcessor& owner)
 
         // Right-clicking a pad is where a player looks for MIDI settings, so it offers the
         // note map directly rather than only in the kit menu.
-        strips[(size_t) t]->onPadContextMenu = [this, t]
-        {
-            showNoteMapMenu (strips[(size_t) t].get());
-        };
+        strips[(size_t) t]->onPadContextMenu = [this] { showNoteMapMenu(); };
         addAndMakeVisible (*strips[(size_t) t]);
     }
 
@@ -235,14 +232,16 @@ void DrumKitEditor::handleKitMenuResult (int result)
     }
 }
 
-void DrumKitEditor::showNoteMapMenu (juce::Component* target)
+void DrumKitEditor::showNoteMapMenu()
 {
     juce::PopupMenu menu;
 
     for (int i = 0; i < kNumNoteMaps; ++i)
         menu.addItem (3000 + i, noteMapName ((NoteMap) i), true, (int) kit().getNoteMap() == i);
 
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (target),
+    // At the cursor. The pad's parent strip is the full height of the window, so
+    // anchoring to it put the menu nowhere near the click.
+    menu.showMenuAsync (juce::PopupMenu::Options().withMousePosition(),
                         [this] (int result)
                         {
                             if (result >= 3000)
@@ -334,6 +333,11 @@ void DrumKitEditor::refreshKitButton()
 
 void DrumKitEditor::timerCallback()
 {
+    refreshFromProcessor();
+}
+
+void DrumKitEditor::refreshFromProcessor()
+{
     // Polled rather than driven by an attachment: restoring a session changes the kit
     // parameter, and that must not re-apply the preset over the restored values. Only a
     // change we did not make ourselves - automation, or a session load - gets acted on.
@@ -342,6 +346,14 @@ void DrumKitEditor::timerCallback()
 
     for (auto& strip : strips)
         strip->updateFromProcessor();
+}
+
+juce::String DrumKitEditor::getTrackNoteLabel (int trackIndex) const
+{
+    if (! juce::isPositiveAndBelow (trackIndex, kNumTracks))
+        return {};
+
+    return strips[(size_t) trackIndex]->getNoteLabel();
 }
 
 } // namespace df

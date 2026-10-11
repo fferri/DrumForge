@@ -21,6 +21,7 @@
 #include "Core/KitLibrary.h"
 #include "Core/Randomizer.h"
 #include "Core/Settings.h"
+#include "UI/DrumKitEditor.h"
 
 using namespace df;
 
@@ -1538,6 +1539,49 @@ void testNoteMapOptions()
     processor.setNoteMap (NoteMap::generalMidi);
 }
 
+void testEditorNoteLabels()
+{
+    section ("Editor: the header note follows the map");
+
+    // This is the wiring the audio tests cannot see. It was wrong once - the refresh
+    // landed in the strip's constructor rather than on the editor's timer, so the label
+    // was correct on open and then never moved when the map changed.
+    DrumKitProcessor processor;
+    processor.prepareToPlay (sampleRate, blockSize);
+
+    DrumKitEditor editor (processor);
+    editor.setSize (1280, 752);
+
+    processor.setNoteMap (NoteMap::generalMidi);
+    editor.refreshFromProcessor();
+
+    check (editor.getTrackNoteLabel (0).contains ("36"), "track 1 shows the General MIDI kick note",
+           editor.getTrackNoteLabel (0));
+    check (editor.getTrackNoteLabel (2).contains ("42"), "and track 3 the General MIDI hat note",
+           editor.getTrackNoteLabel (2));
+
+    processor.setNoteMap (NoteMap::beatStepPro);
+    editor.refreshFromProcessor();
+
+    check (editor.getTrackNoteLabel (0).contains ("39"),
+           "and follows the map when it is changed while the editor is open",
+           editor.getTrackNoteLabel (0));
+    check (editor.getTrackNoteLabel (2).contains ("51"), "on every track, not just the first",
+           editor.getTrackNoteLabel (2));
+    check (! editor.getTrackNoteLabel (0).contains ("36"),
+           "with no trace of the old note left behind", editor.getTrackNoteLabel (0));
+
+    // The label also has to be right for an editor opened while a map is already selected.
+    processor.setNoteMap (NoteMap::beatStepPro);
+    DrumKitEditor reopened (processor);
+    reopened.setSize (1280, 752);
+
+    check (reopened.getTrackNoteLabel (7).contains ("83"),
+           "an editor opened later starts on the right note", reopened.getTrackNoteLabel (7));
+
+    processor.setNoteMap (NoteMap::generalMidi);
+}
+
 } // namespace
 
 int main()
@@ -1575,6 +1619,7 @@ int main()
     testKitLibrary();
     testRandomiser();
     testNoteMapOptions();
+    testEditorNoteLabels();
 
     std::cout << "\n============================\n"
               << passed << " passed, " << failed << " failed\n";

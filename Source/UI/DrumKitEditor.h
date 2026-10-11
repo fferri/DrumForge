@@ -26,11 +26,17 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
 
+    /** One editor tick: what the timer runs, exposed so a test can drive it directly. */
+    void refreshFromProcessor();
+
+    /** What a track's header note caption currently reads. */
+    juce::String getTrackNoteLabel (int trackIndex) const;
+
 private:
     void timerCallback() override;
 
     void showKitMenu();
-    void showNoteMapMenu (juce::Component* target);
+    void showNoteMapMenu();
     void handleKitMenuResult (int result);
     void loadKit (int index);
     void saveCurrentKitAs();
