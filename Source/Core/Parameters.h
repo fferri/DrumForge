@@ -7,6 +7,7 @@
 
 #include "DrumModel.h"
 #include "Models/ModelFactory.h"
+#include "VelocityModulation.h"
 
 namespace df
 {
@@ -70,12 +71,19 @@ struct GlobalParamRefs
     std::atomic<float>* reverbWidth = nullptr;
 };
 
-/** A complete kit: which engine each track runs, how it is driven and how it is set. */
+/** A complete kit: which engine each track runs, how it is driven and how it is set.
+
+    `levelDepth` is the only modulation depth a kit owns. Velocity dynamics are part of a
+    kit's voicing - a 909-ish kit and an acoustic one respond very differently - but the
+    depths on the tone and envelope knobs are the player's expression, so loading a kit
+    leaves those alone.
+*/
 struct KitPresetTrack
 {
     int model;
     int distMode;
     float level, pan, tune, decay, tone, character, sweep, drive, send;
+    float levelDepth;
 };
 
 struct KitPreset
@@ -109,19 +117,18 @@ void cacheParameterPointers (juce::AudioProcessorValueTreeState& state,
                              std::array<TrackParamRefs, kNumTracks>& trackRefs,
                              GlobalParamRefs& globalRefs);
 
-/** Converts the atomic parameter values into the engine-facing description. */
-inline void readTrackParams (const TrackParamRefs& refs, ModelParams& out, bool& muted, bool& soloed) noexcept
+/** Caches the live value and the NormalisableRange of every modulatable parameter.
+
+    The range matters: modulation is applied in normalised space so that a given depth
+    means the same thing on a dB knob and on a 0..1 macro, and so the band the editor draws
+    is symmetric. The depth pointers are filled in separately by the ModulationState.
+*/
+void cacheModulationTargets (juce::AudioProcessorValueTreeState& state,
+                             std::array<TrackModRefs, kNumTracks>& modRefs);
+
+/** Reads just the mute/solo flags; the audible values now come from the modulation path. */
+inline void readTrackState (const TrackParamRefs& refs, bool& muted, bool& soloed) noexcept
 {
-    out.level     = dbToGain (refs.level->load());
-    out.pan       = refs.pan->load();
-    out.tune      = refs.tune->load();
-    out.decay     = refs.decay->load();
-    out.tone      = refs.tone->load();
-    out.character = refs.character->load();
-    out.sweep     = refs.sweep->load();
-    out.drive     = refs.drive->load();
-    out.send      = refs.send->load();
-    out.distMode  = (int) std::lround (refs.dist->load());
     muted = refs.mute->load() > 0.5f;
     soloed = refs.solo->load() > 0.5f;
 }

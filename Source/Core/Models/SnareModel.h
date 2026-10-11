@@ -49,7 +49,7 @@ public:
         active = false;
     }
 
-    void trigger (const ModelParams& p, float velocity, uint32_t seed) override
+    void trigger (const ModelParams& p, uint32_t seed) override
     {
         rng.seed (seed);
 
@@ -66,7 +66,6 @@ public:
         static constexpr float modeDecayScale[numModes] = { 1.0f, 0.80f, 0.60f };
 
         sweepOctaves = p.sweep * 1.1f;
-        velocityGain = 0.35f + 0.65f * velocity;
         wireLevel    = 0.35f + 1.25f * p.character;
         wireDecayScale = lerp (1.0f, 0.30f, p.character);
 
@@ -145,7 +144,7 @@ public:
             const float noise = rumbleCut.processHigh (rng.nextBipolar());
             const float wires = noiseFilter.process (noise).band * noiseEnv.process() * wireLevel * 1.6f;
 
-            out[i] = (body * 0.9f + wires) * velocityGain;
+            out[i] = (body * 0.9f + wires);
         }
 
         if (! isActive())
@@ -175,7 +174,6 @@ private:
     float modeLevel[numModes] { 0.7f, 0.3f, 0.12f };
     float phase[numModes] {};
     float sweepOctaves = 0.5f;
-    float velocityGain = 1.0f;
     float wireLevel = 0.9f;
     float wireDecayScale = 0.6f;
     bool active = false;

@@ -44,12 +44,11 @@ public:
         active = false;
     }
 
-    void trigger (const ModelParams& p, float velocity, uint32_t seed) override
+    void trigger (const ModelParams& p, uint32_t seed) override
     {
         rng.seed (seed);
 
         baseFrequency = 260.0f * semitonesToRatio (p.tune);
-        velocityGain = 0.35f + 0.65f * velocity;
 
         for (auto& osc : oscillators)
             osc.reset (rng.nextUnipolar());
@@ -125,7 +124,7 @@ public:
             source = highPass.process (source).high;
             source = bandPass.process (source).band;
 
-            out[i] = source * ampEnv.process() * velocityGain * 2.4f;
+            out[i] = source * ampEnv.process() * 2.4f;
         }
 
         if (! ampEnv.isActive())
@@ -149,7 +148,6 @@ private:
 
     float sampleRate = 48000.0f;
     float baseFrequency = 260.0f;
-    float velocityGain = 1.0f;
     bool active = false;
 
     SquareOsc oscillators[numPairs * 2];

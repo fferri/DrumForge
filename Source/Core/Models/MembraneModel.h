@@ -49,7 +49,7 @@ public:
         active = false;
     }
 
-    void trigger (const ModelParams& p, float velocity, uint32_t seed) override
+    void trigger (const ModelParams& p, uint32_t seed) override
     {
         rng.seed (seed);
 
@@ -63,8 +63,6 @@ public:
         }
 
         sweepOctaves = p.sweep * 0.7f;
-        velocityGain = 0.35f + 0.65f * velocity;
-        velocityBrightness = 0.75f + 0.55f * velocity;
         strikeLevel = 0.15f + 0.5f * p.tone;
 
         const float baseDecay = decayMs (p.decay);
@@ -108,7 +106,7 @@ public:
 
         for (int m = 0; m < numModes; ++m)
         {
-            modeGain[m] = std::pow (tilt, (float) m) * (m == 0 ? 1.0f : velocityBrightness);
+            modeGain[m] = std::pow (tilt, (float) m);
             energy += modeGain[m] * modeGain[m];
             modeEnv[m].setDecayMs (baseDecay * std::pow (0.66f, (float) m));
         }
@@ -144,7 +142,7 @@ public:
 
             const float strike = strikeCut.processLow (rng.nextBipolar()) * strikeEnv.process() * strikeLevel;
 
-            out[i] = (sum + strike) * velocityGain;
+            out[i] = (sum + strike);
         }
 
         if (! isActive())
@@ -174,8 +172,6 @@ private:
     float partialFrequency[numModes] {};
     float phase[numModes] {};
     float sweepOctaves = 0.3f;
-    float velocityGain = 1.0f;
-    float velocityBrightness = 1.0f;
     float strikeLevel = 0.4f;
     bool active = false;
 

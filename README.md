@@ -74,6 +74,39 @@ Drive at 0 is a true bypass whatever curve is selected.
 
 ---
 
+## Dynamics: velocity modulation
+
+Every continuous per-track parameter — the four macros plus `Tune`, `Level`, `Drive`, `Pan`
+and `Send` — can be swept by velocity. Each gets its own bipolar **depth**, so one knob can
+go from barely responsive to a full sweep in either direction.
+
+The curve is anchored at **velocity 100**, which is what most keyboards and pads send by
+default:
+
+| Velocity | Effect |
+|---|---|
+| 127 | the full depth above the dialled value |
+| **100** | the knob exactly as dialled, whatever the depth |
+| 0 | the full depth below it |
+
+Depth at 0 means velocity does not affect that parameter at all — bit for bit — so a track
+is completely flat until you ask for dynamics.
+
+Modulation is applied in *normalised* parameter space, so a depth of 0.1 means a tenth of
+the knob's travel whether that knob is in dB, semitones or a 0..1 macro. It is latched at
+note-on, so a ringing hit keeps the character it was struck with while other tracks move on.
+
+This replaced four hard-coded velocity responses that used to live inside the engines: a
+fixed loudness curve on all nine, plus velocity→brightness on Membrane and velocity→index on
+Clang and FM Perc. Those existed only on the engines where someone had thought to add them.
+Now all nine respond the same way, and you decide how much.
+
+Depths are deliberately **not** automation parameters. Automating a knob and automating
+velocity already spans the space — depth is only the slope between them, which is exactly
+the thing that should stay static. They are still saved with your session.
+
+---
+
 ## Factory kits
 
 The kit selector in the header loads a complete setup — engines, curves, tunings, levels,
@@ -84,6 +117,10 @@ pans and sends — in one go. Every track stays editable afterwards.
 | **Industrial** (default) | Wavefolded kick, snare tuned a tritone from it, bit-crushed hats, Rumble on the tom slot and Clang on the crash slot. ~3.5 dB hotter RMS than Studio |
 | **Warehouse** | Hard-clipped kick and snare, fuzzed tom, FM Perc on the ride slot. Tough but still musical |
 | **Studio** | The original clean kit, so nothing was lost in the twist |
+
+A kit also sets each track's **level depth**, because velocity dynamics are part of a kit's
+voicing — a machine-style kit and an acoustic one respond very differently. The depths on
+the tone and envelope knobs are the player's expression, so loading a kit leaves those alone.
 
 ---
 
@@ -126,6 +163,8 @@ Source/
     Envelopes.h           percussive AD envelope + exponential decay contour
     DrumModel.h           ModelId, ModelInfo, ModelParams, engine base class
     Models/               one file per engine, plus the factory and metadata table
+    VelocityModulation.h  the velocity curve and how it moves a parameter
+    ModulationState.*     per-parameter depths: saved with the session, not automatable
     DrumTrack.h           one track: engine hosting, per-track FX, metering
     Parameters.h/.cpp     APVTS layout, GM note map, factory kits
     DrumKitProcessor.*    the AudioProcessor: 8 tracks, MIDI, reverb bus, master
@@ -137,7 +176,7 @@ Source/
   PluginEntry.cpp         createPluginFilter()
 Tools/
   RenderDemo.cpp          offline WAV renderer
-  RenderTests.cpp         offline verification suite (154 checks)
+  RenderTests.cpp         offline verification suite (191 checks)
   RenderScreenshot.cpp    editor smoke test / screenshot generator
   HostLoadTest.cpp        loads the built .vst3 through a real VST3 host (22 checks)
 ```
@@ -161,6 +200,9 @@ Design points worth knowing:
   level/pan/drive/send.
 - **Master soft clipper** guarantees the output never exceeds full scale, however densely
   the kit is played.
+- **Velocity enters the system in exactly one place.** The engines no longer read it at all;
+  it reaches them only as already-modulated parameter values, which is what makes the
+  behaviour adjustable instead of hard-coded.
 
 ---
 
@@ -209,7 +251,7 @@ under the *Drum* category.
 
 ```sh
 cmake --build build
-./build/DrumForgeTests_artefacts/Release/DrumForgeTests              # 154 checks
+./build/DrumForgeTests_artefacts/Release/DrumForgeTests              # 191 checks
 ./build/DrumForgeHostTest_artefacts/Release/DrumForgeHostTest.app/Contents/MacOS/DrumForgeHostTest   # 22 checks
 ./build/DrumForgeScreenshot_artefacts/Release/DrumForgeScreenshot.app/Contents/MacOS/DrumForgeScreenshot docs/screenshot.png
 ./build/DrumForgeRender_artefacts/Release/DrumForgeRender renders    # writes WAVs you can listen to
@@ -220,8 +262,12 @@ audible output, stays finite, decays to true silence, never exceeds full scale a
 within 30 ms; that all engines work at 44.1/48/88.2/96 kHz; that retriggering a ringing
 track produces no step discontinuity; that Drive at 0 is a true bypass and that all five
 distortion curves differ from each other while staying within a couple of dB of the clean
-signal; that every factory kit applies its engines, curves and tunings to all eight tracks
-and plays back inside full scale; that the GM note map, the hi-hat choke group, mute, solo
+signal; that every factory kit applies its engines, curves and tunings to all eight tracks,
+plays inside full scale and still has a usable dynamic range; that the velocity curve anchors
+at 100, is symmetric and is monotonic; that depth 0 is an exact bypass at any velocity and a
+nominal hit is bit-identical whatever the depth; that modulation clamps rather than wraps;
+and that depths survive a session save while a session without them clears any leftovers;
+that the GM note map, the hi-hat choke group, mute, solo
 and the post-fader reverb send all behave; that state round-trips exactly; and that the
 plugin survives the full host lifecycle — repeated `prepareToPlay`, `releaseResources` in
 between, sample-rate and buffer-size changes, and blocks larger or smaller than the

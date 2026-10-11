@@ -37,7 +37,7 @@ public:
         active = false;
     }
 
-    void trigger (const ModelParams& p, float velocity, uint32_t seed) override
+    void trigger (const ModelParams& p, uint32_t seed) override
     {
         rng.seed (seed);
 
@@ -47,8 +47,7 @@ public:
         modulatorRatio = ratios[ratioIndex];
 
         // Harder hits are brighter, as on a real struck bar.
-        indexAmount = p.sweep * 12.0f * (0.55f + 0.75f * velocity);
-        velocityGain = 0.35f + 0.65f * velocity;
+        indexAmount = p.sweep * 12.0f;
 
         carrierPhase = 0.0f;
         modulatorPhase = 0.0f;
@@ -106,7 +105,7 @@ public:
             const float carrier = std::sin (kTwoPi * carrierPhase + modulator * index);
             const float filtered = toneFilter.process (carrier).low;
 
-            out[i] = filtered * ampEnv.process() * velocityGain;
+            out[i] = filtered * ampEnv.process();
         }
 
         if (! ampEnv.isActive())
@@ -123,7 +122,6 @@ private:
     float carrierFrequency = 240.0f;
     float modulatorRatio = 2.0f;
     float indexAmount = 3.0f;
-    float velocityGain = 1.0f;
     float carrierPhase = 0.0f;
     float modulatorPhase = 0.0f;
     bool active = false;

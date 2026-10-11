@@ -79,7 +79,7 @@ public:
 
     virtual void prepare (double sampleRate) = 0;
     virtual void reset() = 0;
-    virtual void trigger (const ModelParams& params, float velocity, uint32_t seed) = 0;
+    virtual void trigger (const ModelParams& params, uint32_t seed) = 0;
     virtual void choke() = 0;
     virtual void render (float* mono, int numSamples, const ModelParams& params) = 0;
     virtual bool isActive() const noexcept = 0;

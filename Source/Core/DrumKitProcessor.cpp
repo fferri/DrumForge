@@ -7,9 +7,22 @@ namespace df
 
 DrumKitProcessor::DrumKitProcessor()
     : juce::AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
-      apvts (*this, nullptr, "PARAMETERS", createParameterLayout())
+      apvts (*this, nullptr, "PARAMETERS", createParameterLayout()),
+      modulation (apvts)
 {
     cacheParameterPointers (apvts, trackRefs, globalRefs);
+    cacheModulationTargets (apvts, modRefs);
+
+    for (int t = 0; t < kNumTracks; ++t)
+    {
+        for (int i = 0; i < kNumModTargets; ++i)
+            modRefs[(size_t) t].targets[i].depth = modulation.depthPointer (t, i);
+
+        // Until a track has been played there is no hit to react to, so sit on the nominal
+        // velocity - which leaves every knob reading exactly as dialled.
+        lastVelocity[(size_t) t].store (kNominalVelocity, std::memory_order_relaxed);
+    }
+
     reverb.setSampleRate (48000.0);
 }
 
@@ -52,19 +65,14 @@ void DrumKitProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
     if (numSamples <= 0 || mixBuffer.getNumSamples() < 1)
         return;
 
-    // ---- Snapshot every parameter once per block ------------------------------
+    // ---- Snapshot the per-block flags ----------------------------------------
     anySolo = false;
 
     for (int t = 0; t < kNumTracks; ++t)
     {
-        readTrackParams (trackRefs[(size_t) t], blockParams[(size_t) t],
-                         blockMuted[(size_t) t], blockSoloed[(size_t) t]);
+        readTrackState (trackRefs[(size_t) t], blockMuted[(size_t) t], blockSoloed[(size_t) t]);
         anySolo = anySolo || blockSoloed[(size_t) t];
     }
-
-    for (int t = 0; t < kNumTracks; ++t)
-        if (blockMuted[(size_t) t] || (anySolo && ! blockSoloed[(size_t) t]))
-            blockParams[(size_t) t].level = 0.0f;
 
     applyModelSelection();
 
@@ -142,8 +150,11 @@ void DrumKitProcessor::renderChunk (int numSamples)
     mixBuffer.clear (0, numSamples);
     sendBuffer.clear (0, numSamples);
 
+    // Each track keeps the velocity of its own last hit, so a ringing sound holds the
+    // character it was struck with while other tracks move on.
     for (int t = 0; t < kNumTracks; ++t)
-        tracks[(size_t) t].render (mixBuffer, sendBuffer, 0, numSamples, blockParams[(size_t) t]);
+        tracks[(size_t) t].render (mixBuffer, sendBuffer, 0, numSamples,
+                                   buildTrackParams (t, lastVelocity[(size_t) t].load (std::memory_order_relaxed)));
 
     // ---- Shared reverb on the send bus ---------------------------------------
     juce::Reverb::Parameters reverbParameters;
@@ -201,8 +212,10 @@ void DrumKitProcessor::triggerTrackInternal (int trackIndex, float velocity)
     if (trackIndex < 0 || trackIndex >= kNumTracks)
         return;
 
-    tracks[(size_t) trackIndex].trigger (blockParams[(size_t) trackIndex],
-                                         juce::jlimit (0.0f, 1.0f, velocity),
+    const float clampedVelocity = juce::jlimit (0.0f, 1.0f, velocity);
+    lastVelocity[(size_t) trackIndex].store (clampedVelocity, std::memory_order_relaxed);
+
+    tracks[(size_t) trackIndex].trigger (buildTrackParams (trackIndex, clampedVelocity),
                                          triggerRng.nextU32());
 
     // Closed and pedal hi-hats cut the open hi-hat short.
@@ -262,6 +275,54 @@ int DrumKitProcessor::getActiveModel (int trackIndex) const noexcept
     return tracks[(size_t) trackIndex].getModelIndex();
 }
 
+ModelParams DrumKitProcessor::buildTrackParams (int trackIndex, float velocity) const
+{
+    ModulatedValues modulated;
+    applyVelocityModulation (modRefs[(size_t) trackIndex], velocity, modulated);
+
+    const auto value = [&modulated] (ModTarget target)
+    {
+        return modulated.values[(size_t) (int) target];
+    };
+
+    ModelParams params;
+    params.level     = dbToGain (value (ModTarget::level));
+    params.pan       = value (ModTarget::pan);
+    params.tune      = value (ModTarget::tune);
+    params.decay     = value (ModTarget::decay);
+    params.tone      = value (ModTarget::tone);
+    params.character = value (ModTarget::character);
+    params.sweep     = value (ModTarget::sweep);
+    params.drive     = value (ModTarget::drive);
+    params.send      = value (ModTarget::send);
+    params.distMode  = (int) std::lround (trackRefs[(size_t) trackIndex].dist->load());
+
+    // Mute and solo are applied after modulation so a muted track stays silent whatever
+    // velocity arrives.
+    if (blockMuted[(size_t) trackIndex] || (anySolo && ! blockSoloed[(size_t) trackIndex]))
+        params.level = 0.0f;
+
+    return params;
+}
+
+void DrumKitProcessor::setModulationDepth (int trackIndex, int modTarget, float depth)
+{
+    modulation.setDepth (trackIndex, modTarget, depth);
+}
+
+float DrumKitProcessor::getModulationDepth (int trackIndex, int modTarget) const noexcept
+{
+    return modulation.getDepth (trackIndex, modTarget);
+}
+
+float DrumKitProcessor::getLastVelocity (int trackIndex) const noexcept
+{
+    if (! juce::isPositiveAndBelow (trackIndex, kNumTracks))
+        return kNominalVelocity;
+
+    return lastVelocity[(size_t) trackIndex].load (std::memory_order_relaxed);
+}
+
 void DrumKitProcessor::setParameterValue (juce::AudioProcessorValueTreeState& state,
                                           const juce::String& parameterID,
                                           float value)
@@ -314,6 +375,10 @@ void DrumKitProcessor::applyKitPreset (int kitIndex)
         setParameterValue (apvts, id (pid::sweep),     d.sweep);
         setParameterValue (apvts, id (pid::drive),     d.drive);
         setParameterValue (apvts, id (pid::send),      d.send);
+
+        // A kit owns the velocity dynamics; the depths on the tone and envelope knobs
+        // belong to the player and deliberately survive a kit change.
+        modulation.setDepth (t, (int) ModTarget::level, d.levelDepth);
     }
 }
 
@@ -331,8 +396,15 @@ void DrumKitProcessor::getStateInformation (juce::MemoryBlock& destData)
 void DrumKitProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     if (auto xml = getXmlFromBinary (data, sizeInBytes))
+    {
         if (xml->hasTagName (apvts.state.getType()))
+        {
             apvts.replaceState (juce::ValueTree::fromXml (*xml));
+
+            // The depths live in that tree, not in parameters, so re-mirror them.
+            modulation.reloadFromState();
+        }
+    }
 }
 
 } // namespace df

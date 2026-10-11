@@ -5,6 +5,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #include "DrumTrack.h"
+#include "ModulationState.h"
 #include "Parameters.h"
 
 namespace df
@@ -67,6 +68,21 @@ public:
     /** Index of the kit currently selected (reads the parameter). */
     int getSelectedKit() const noexcept;
 
+    //==============================================================================
+    // Velocity modulation. Depths are deliberately not parameters, so they have their own
+    // accessors rather than going through apvts.getParameter().
+
+    ModulationState& getModulationState() noexcept { return modulation; }
+    const ModulationState& getModulationState() const noexcept { return modulation; }
+
+    /** Sets how far a velocity sweep moves one parameter. `depth` is -1..1. Message thread. */
+    void setModulationDepth (int trackIndex, int modTarget, float depth);
+
+    float getModulationDepth (int trackIndex, int modTarget) const noexcept;
+
+    /** Velocity of the most recent hit on a track, used to draw the modulation band. */
+    float getLastVelocity (int trackIndex) const noexcept;
+
     /** Index of the model currently selected on a track (reads the parameter). */
     int getSelectedModel (int trackIndex) const noexcept;
 
@@ -85,12 +101,16 @@ private:
     void applyModelSelection();
     void renderChunk (int numSamples);
 
+    /** Resolves one track's parameters for a hit at the given velocity. */
+    ModelParams buildTrackParams (int trackIndex, float velocity) const;
+
     static void setParameterValue (juce::AudioProcessorValueTreeState& state,
                                    const juce::String& parameterID,
                                    float value);
 
     std::array<DrumTrack, kNumTracks> tracks;
     std::array<TrackParamRefs, kNumTracks> trackRefs {};
+    std::array<TrackModRefs, kNumTracks> modRefs {};
     GlobalParamRefs globalRefs;
 
     juce::Reverb reverb;
@@ -98,10 +118,16 @@ private:
     juce::AudioBuffer<float> sendBuffer;
     int preparedBlockSize = 512;
 
-    std::array<ModelParams, kNumTracks> blockParams {};
     std::array<bool, kNumTracks> blockMuted {};
     std::array<bool, kNumTracks> blockSoloed {};
     bool anySolo = false;
+
+    // Modulation is latched per track at note-on, so a ringing hit keeps the character it
+    // was struck with until the next hit re-latches it. Atomic because the editor also
+    // reads it, to place the dot on the modulation band.
+    std::array<std::atomic<float>, kNumTracks> lastVelocity;
+
+    ModulationState modulation;
 
     Rng triggerRng { 0x51ed2701u };
 

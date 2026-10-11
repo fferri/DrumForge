@@ -42,7 +42,7 @@ public:
         active = false;
     }
 
-    void trigger (const ModelParams& p, float velocity, uint32_t seed) override
+    void trigger (const ModelParams& p, uint32_t seed) override
     {
         rng.seed (seed);
 
@@ -50,7 +50,6 @@ public:
         sweepOctaves = p.sweep * 2.5f;
         detune = lerp (0.0015f, 0.035f, p.character);
         gritLevel = p.character * 0.9f;
-        velocityGain = 0.35f + 0.65f * velocity;
 
         phaseA = 0.0f;
         phaseB = 0.0f;
@@ -104,7 +103,7 @@ public:
 
             const float grit = gritCut.processLow (rng.nextBipolar()) * gritLevel;
 
-            out[i] = (sub + grit) * ampEnv.process() * velocityGain * 0.9f;
+            out[i] = (sub + grit) * ampEnv.process() * 0.9f;
         }
 
         if (! ampEnv.isActive())
@@ -124,7 +123,6 @@ private:
     float sweepOctaves = 1.0f;
     float detune = 0.01f;
     float gritLevel = 0.5f;
-    float velocityGain = 1.0f;
     float phaseA = 0.0f;
     float phaseB = 0.0f;
     bool active = false;

@@ -40,14 +40,13 @@ public:
         active = false;
     }
 
-    void trigger (const ModelParams& p, float velocity, uint32_t seed) override
+    void trigger (const ModelParams& p, uint32_t seed) override
     {
         rng.seed (seed);
 
         burstCount = 2 + (int) std::lround (p.sweep * 3.0f);
         spacingSamples = std::max (1, (int) (lerp (4.0f, 22.0f, p.character) * 0.001f * sampleRate));
         tailMs = expMap (p.decay, 90.0f, 1600.0f);
-        velocityGain = 0.35f + 0.65f * velocity;
 
         env.setAttackMs (0.2f);
         env.setDecayMs (burstMs);
@@ -97,7 +96,7 @@ public:
             const float noise = highPass.process (rng.nextBipolar()).high;
             const float shaped = bandPass.process (noise).band;
 
-            out[i] = shaped * env.process() * velocityGain * 3.2f;
+            out[i] = shaped * env.process() * 3.2f;
             ++sampleCounter;
         }
 
@@ -112,7 +111,6 @@ private:
 
     float sampleRate = 48000.0f;
     float tailMs = 400.0f;
-    float velocityGain = 1.0f;
     int burstCount = 3;
     int burstsDone = 0;
     int spacingSamples = 480;

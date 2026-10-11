@@ -57,17 +57,16 @@ public:
         active = false;
     }
 
-    void trigger (const ModelParams& p, float velocity, uint32_t seed) override
+    void trigger (const ModelParams& p, uint32_t seed) override
     {
         rng.seed (seed);
 
         baseFrequency = 180.0f * semitonesToRatio (p.tune);
         sweepOctaves = p.sweep * 1.2f;
         clang = p.character;
-        velocityGain = 0.35f + 0.65f * velocity;
 
         // Harder hits excite more of the inharmonic content.
-        fmIndex = p.character * 7.0f * (0.6f + 0.8f * velocity);
+        fmIndex = p.character * 7.0f;
 
         for (int v = 0; v < numVoices; ++v)
         {
@@ -147,7 +146,7 @@ public:
                                    * strikeEnv.process() * strikeLevel;
             const float shaped = shaper.process (sum + strike).band;
 
-            out[i] = shaped * ampEnv.process() * velocityGain * 2.6f;
+            out[i] = shaped * ampEnv.process() * 2.6f;
         }
 
         if (! ampEnv.isActive())
@@ -191,7 +190,6 @@ private:
     float sweepOctaves = 0.5f;
     float clang = 0.5f;
     float fmIndex = 3.0f;
-    float velocityGain = 1.0f;
     bool active = false;
 
     float carrierPhase[numVoices] {};

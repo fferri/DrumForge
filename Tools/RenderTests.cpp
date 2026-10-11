@@ -872,6 +872,256 @@ void testKitPresets()
              + " dB vs reference rms " + juce::String (juce::Decibels::gainToDecibels (reference, -100.0f), 1) + " dB");
 }
 
+float maxAbsDifference (const juce::AudioBuffer<float>& a, const juce::AudioBuffer<float>& b)
+{
+    const int n = std::min (a.getNumSamples(), b.getNumSamples());
+    float worst = 0.0f;
+
+    for (int i = 0; i < n; ++i)
+        worst = std::max (worst, std::abs (a.getReadPointer (0)[i] - b.getReadPointer (0)[i]));
+
+    return worst;
+}
+
+void testVelocityModulationMaths()
+{
+    section ("Velocity modulation: curve and clamping");
+
+    const auto near = [] (float a, float b) { return std::abs (a - b) < 1.0e-5f; };
+
+    check (near (velocityBipolar (0.0f), -1.0f), "velocity 0 maps to -1", juce::String (velocityBipolar (0.0f), 4));
+    check (near (velocityBipolar (kNominalVelocity), 0.0f), "velocity 100 maps to 0",
+           juce::String (velocityBipolar (kNominalVelocity), 6));
+    check (near (velocityBipolar (1.0f), 1.0f), "velocity 127 maps to +1", juce::String (velocityBipolar (1.0f), 4));
+
+    // Symmetric: equal distance above and below the nominal hit.
+    const float above = velocityBipolar (1.0f) - velocityBipolar (kNominalVelocity);
+    const float below = velocityBipolar (kNominalVelocity) - velocityBipolar (0.0f);
+    check (near (above, below), "the sweep is symmetric about the nominal hit",
+           "+" + juce::String (above, 4) + " / -" + juce::String (below, 4));
+
+    check (near (velocityBipolar (-3.0f), -1.0f) && near (velocityBipolar (4.0f), 1.0f),
+           "velocities outside 0..1 clamp rather than wrap");
+
+    check (velocityBipolar (0.9f) > velocityBipolar (0.8f), "the curve is monotonic");
+
+    // ---- applying it to a value ------------------------------------------
+    std::atomic<float> value { 0.5f };
+    std::atomic<float> depth { 0.0f };
+    juce::NormalisableRange<float> range { 0.0f, 1.0f };
+
+    TrackModRefs refs;
+
+    for (int i = 0; i < kNumModTargets; ++i)
+    {
+        refs.targets[i].value = &value;
+        refs.targets[i].range = &range;
+        refs.targets[i].depth = &depth;
+    }
+
+    ModulatedValues out;
+
+    for (float v : { 0.0f, 0.4f, kNominalVelocity, 1.0f })
+    {
+        applyVelocityModulation (refs, v, out);
+        check (near (out.values[0], 0.5f), "depth 0 leaves the value untouched at any velocity",
+               juce::String (out.values[0], 6));
+    }
+
+    depth.store (0.25f);
+
+    applyVelocityModulation (refs, 1.0f, out);
+    check (near (out.values[0], 0.75f), "depth +0.25 at full velocity moves a quarter of the travel",
+           juce::String (out.values[0], 4));
+
+    applyVelocityModulation (refs, 0.0f, out);
+    check (near (out.values[0], 0.25f), "depth +0.25 at zero velocity moves a quarter the other way",
+           juce::String (out.values[0], 4));
+
+    applyVelocityModulation (refs, kNominalVelocity, out);
+    check (near (out.values[0], 0.5f), "the nominal hit always plays the knob as dialled regardless of depth");
+
+    depth.store (-0.25f);
+    applyVelocityModulation (refs, 1.0f, out);
+    check (near (out.values[0], 0.25f), "negative depth reverses the direction", juce::String (out.values[0], 4));
+
+    // ---- clamping at the ends --------------------------------------------
+    value.store (0.9f);
+    depth.store (0.5f);
+    applyVelocityModulation (refs, 1.0f, out);
+    check (out.values[0] <= 1.0f + 1.0e-5f, "clamps at the top instead of wrapping",
+           juce::String (out.values[0], 4));
+
+    value.store (0.1f);
+    applyVelocityModulation (refs, 0.0f, out);
+    check (out.values[0] >= -1.0e-5f, "clamps at the bottom instead of wrapping",
+           juce::String (out.values[0], 4));
+
+    // ---- the band the editor will draw agrees with the audio path ---------
+    value.store (0.5f);
+    depth.store (0.25f);
+
+    float low = 0.0f, high = 0.0f;
+
+    check (velocityBand (range, 0.5f, 0.25f, low, high), "a modulated knob reports a band");
+    check (near (low, 0.25f) && near (high, 0.75f), "the band spans exactly the modulated range",
+           juce::String (low, 3) + " .. " + juce::String (high, 3));
+
+    check (! velocityBand (range, 0.5f, 0.0f, low, high), "an unmodulated knob reports no band");
+
+    // A skewed range must not break the symmetry of the band.
+    juce::NormalisableRange<float> skewed { 0.0f, 1.0f };
+    skewed.setSkewForCentre (0.2f);
+
+    const float centre = skewed.convertTo0to1 (0.5f);
+
+    check (velocityBand (skewed, 0.5f, 0.2f, low, high) && near (high - centre, centre - low),
+           "the band stays symmetric about the value on a skewed range",
+           "centre " + juce::String (centre, 4) + ", band " + juce::String (low, 4)
+             + " .. " + juce::String (high, 4));
+}
+
+void testVelocityModulationAudio()
+{
+    section ("Velocity modulation: through the audio path");
+
+    const auto render = [] (float velocity, float toneDepth, float levelDepth)
+    {
+        DrumKitProcessor processor;
+        processor.prepareToPlay (sampleRate, blockSize);
+        setParameter (processor, pid::reverbMix, 0.0f);
+        setParameter (processor, pid::master, -12.0f);
+        setParameter (processor, pid::track (0, pid::level), -12.0f);
+        setParameter (processor, pid::track (0, pid::dist), (float) DistortionMode::soft);
+
+        processor.setModulationDepth (0, (int) ModTarget::tone, toneDepth);
+        processor.setModulationDepth (0, (int) ModTarget::level, levelDepth);
+
+        std::vector<Event> events;
+        events.emplace_back (0.05, juce::MidiMessage::noteOn (1, primaryNoteForTrack (0),
+                                                              (juce::uint8) juce::jlimit (1, 127, (int) std::lround (velocity * 127.0f))));
+
+        return renderEvents (processor, events, 1.0);
+    };
+
+    // With every depth at zero, velocity is completely inert - a soft hit and a hard hit
+    // are bit-identical. This is the property that makes the knob mean what it says.
+    const auto softFlat = render (0.2f, 0.0f, 0.0f);
+    const auto hardFlat = render (1.0f, 0.0f, 0.0f);
+
+    check (maxAbsDifference (softFlat, hardFlat) <= 0.0f,
+           "with every depth at 0, velocity does not change the sound at all");
+
+    // Now give it a tone depth and the timbre starts to track velocity.
+    check (maxAbsDifference (render (0.2f, 0.4f, 0.0f), render (1.0f, 0.4f, 0.0f)) > 1.0e-3f,
+           "a tone depth makes velocity change the timbre");
+
+    // A level depth must produce an ordered, audible dynamic range.
+    const float softPeak = render (0.25f, 0.0f, 0.15f).getMagnitude (0, (int) (sampleRate * 1.0));
+    const float midPeak = render (kNominalVelocity, 0.0f, 0.15f).getMagnitude (0, (int) (sampleRate * 1.0));
+    const float hardPeak = render (1.0f, 0.0f, 0.15f).getMagnitude (0, (int) (sampleRate * 1.0));
+
+    check (hardPeak > midPeak && midPeak > softPeak, "a level depth makes harder hits louder",
+           juce::String (juce::Decibels::gainToDecibels (softPeak, -100.0f), 1) + " / "
+             + juce::String (juce::Decibels::gainToDecibels (midPeak, -100.0f), 1) + " / "
+             + juce::String (juce::Decibels::gainToDecibels (hardPeak, -100.0f), 1) + " dBFS");
+
+    const float spanDb = juce::Decibels::gainToDecibels (hardPeak / softPeak, -100.0f);
+
+    check (spanDb > 6.0f, "the level depth produces a usable dynamic range",
+           juce::String (spanDb, 1) + " dB across velocity 32..127");
+
+    // The nominal hit must land on the knob value whatever the depth is.
+    check (std::abs (maxAbsDifference (render (kNominalVelocity, 0.0f, 0.0f),
+                                       render (kNominalVelocity, 0.0f, 0.15f))) <= 0.0f,
+           "a nominal hit sounds identical whatever the depth, as the design promises");
+}
+
+void testModulationStatePersistence()
+{
+    section ("Velocity modulation: state");
+
+    const auto near = [] (float a, float b) { return std::abs (a - b) < 1.0e-5f; };
+
+    DrumKitProcessor source;
+    source.prepareToPlay (sampleRate, blockSize);
+
+    source.setModulationDepth (2, (int) ModTarget::character, 0.42f);
+    source.setModulationDepth (2, (int) ModTarget::drive, -0.33f);
+    source.setModulationDepth (5, (int) ModTarget::send, 0.75f);
+
+    check (near (source.getModulationDepth (2, (int) ModTarget::character), 0.42f), "a depth reads back");
+
+    source.setModulationDepth (0, (int) ModTarget::decay, 5.0f);
+    check (near (source.getModulationDepth (0, (int) ModTarget::decay), 1.0f), "out-of-range depths clamp to +1");
+
+    source.setModulationDepth (0, (int) ModTarget::tone, -9.0f);
+    check (near (source.getModulationDepth (0, (int) ModTarget::tone), -1.0f), "and to -1");
+
+    juce::MemoryBlock state;
+    source.getStateInformation (state);
+
+    DrumKitProcessor restored;
+    restored.prepareToPlay (sampleRate, blockSize);
+    restored.setStateInformation (state.getData(), (int) state.getSize());
+
+    check (near (restored.getModulationDepth (2, (int) ModTarget::character), 0.42f), "character depth restored");
+    check (near (restored.getModulationDepth (2, (int) ModTarget::drive), -0.33f), "drive depth restored");
+    check (near (restored.getModulationDepth (5, (int) ModTarget::send), 0.75f), "send depth restored");
+    check (near (restored.getModulationDepth (0, (int) ModTarget::decay), 1.0f), "clamped depth restored");
+
+    // Depths are deliberately not parameters, so they must not show up in automation.
+    check (restored.apvts.getParameter ("t3_characterVel") == nullptr
+             && restored.apvts.getParameter ("t1_decayMod") == nullptr,
+           "depths are not exposed as automatable parameters");
+
+    // A session whose tree has no modulation node - saved before the feature existed, or
+    // simply never used - must clear whatever the instance happened to hold.
+    DrumKitProcessor legacy;
+    legacy.prepareToPlay (sampleRate, blockSize);
+
+    juce::MemoryBlock legacyState;
+    legacy.getStateInformation (legacyState);
+
+    DrumKitProcessor reused;
+    reused.prepareToPlay (sampleRate, blockSize);
+    reused.setModulationDepth (3, (int) ModTarget::tone, 0.9f);
+    reused.setStateInformation (legacyState.getData(), (int) legacyState.getSize());
+
+    check (near (reused.getModulationDepth (3, (int) ModTarget::tone), 0.0f),
+           "a session with no modulation data clears leftover depths");
+}
+
+void testKitDynamics()
+{
+    section ("Kit velocity dynamics");
+
+    const auto peakAt = [] (int kitIndex, float velocity)
+    {
+        DrumKitProcessor processor;
+        processor.prepareToPlay (sampleRate, blockSize);
+        processor.applyKitPreset (kitIndex);
+
+        std::vector<Event> events;
+        events.emplace_back (0.05, juce::MidiMessage::noteOn (1, primaryNoteForTrack (0),
+                                                              (juce::uint8) juce::jlimit (1, 127, (int) std::lround (velocity * 127.0f))));
+
+        return renderEvents (processor, events, 1.0).getMagnitude (0, (int) (sampleRate * 1.0));
+    };
+
+    // The engines no longer bake in a velocity response, so if a kit does not dial a level
+    // depth then its tracks are completely flat. Every shipped kit must therefore have one.
+    for (int k = 0; k < numKitPresets(); ++k)
+    {
+        const float soft = peakAt (k, 0.25f);
+        const float hard = peakAt (k, 1.0f);
+        const float spanDb = juce::Decibels::gainToDecibels (hard / soft, -100.0f);
+
+        check (spanDb > 6.0f, juce::String (kitPreset (k).name) + ": velocity produces real dynamics",
+               juce::String (spanDb, 1) + " dB between velocity 32 and 127");
+    }
+}
+
 } // namespace
 
 int main()
@@ -896,6 +1146,10 @@ int main()
     testHostLifecycle();
     testDistortionModes();
     testKitPresets();
+    testVelocityModulationMaths();
+    testVelocityModulationAudio();
+    testModulationStatePersistence();
+    testKitDynamics();
 
     std::cout << "\n============================\n"
               << passed << " passed, " << failed << " failed\n";

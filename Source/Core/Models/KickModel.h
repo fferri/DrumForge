@@ -36,14 +36,13 @@ public:
         active = false;
     }
 
-    void trigger (const ModelParams& p, float velocity, uint32_t seed) override
+    void trigger (const ModelParams& p, uint32_t seed) override
     {
         rng.seed (seed);
 
         baseFrequency = 48.0f * semitonesToRatio (p.tune);
         sweepOctaves  = p.sweep * 4.5f;
         sweepTauMs    = lerp (75.0f, 9.0f, p.character);
-        velocityGain  = 0.35f + 0.65f * velocity;
 
         phase = 0.0f;
         clickLowpassState = 0.0f;
@@ -105,7 +104,7 @@ public:
                 sample += (noise - clickLowpassState) * clickEnvValue * clickLevel * 1.4f;
             }
 
-            out[i] = sample * ampEnv.process() * velocityGain;
+            out[i] = sample * ampEnv.process();
         }
 
         if (! ampEnv.isActive())
@@ -124,7 +123,6 @@ private:
     float baseFrequency = 48.0f;
     float sweepOctaves = 3.0f;
     float sweepTauMs = 40.0f;
-    float velocityGain = 1.0f;
     float phase = 0.0f;
     float clickLowpassState = 0.0f;
     bool active = false;

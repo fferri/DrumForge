@@ -48,7 +48,7 @@ public:
         active = false;
     }
 
-    void trigger (const ModelParams& p, float velocity, uint32_t seed) override
+    void trigger (const ModelParams& p, uint32_t seed) override
     {
         rng.seed (seed);
 
@@ -59,7 +59,6 @@ public:
 
         baseFrequency = base;
         sweepOctaves  = p.sweep * 0.6f;
-        velocityGain  = 0.35f + 0.65f * velocity;
 
         pitchEnv.setTimeMs (12.0f);
         pitchEnv.trigger();
@@ -124,7 +123,7 @@ public:
             source = highPass.process (source).high;
             source = bandPass.process (source).band;
 
-            out[i] = source * ampEnv.process() * velocityGain * 4.5f;
+            out[i] = source * ampEnv.process() * 4.5f;
         }
 
         if (! ampEnv.isActive())
@@ -145,7 +144,6 @@ private:
     float sampleRate = 48000.0f;
     float baseFrequency = 105.0f;
     float sweepOctaves = 0.2f;
-    float velocityGain = 1.0f;
     bool active = false;
 
     SquareOsc oscillators[numOscillators];

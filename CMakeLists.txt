@@ -19,6 +19,7 @@ add_subdirectory(JUCE)
 #===============================================================================
 add_library(DrumForgeCore STATIC
     Source/Core/Parameters.cpp
+    Source/Core/ModulationState.cpp
     Source/Core/DrumKitProcessor.cpp
     Source/UI/Theme.cpp
     Source/UI/ModelKnob.cpp

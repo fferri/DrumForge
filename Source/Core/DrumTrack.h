@@ -108,7 +108,7 @@ public:
 
     int getModelIndex() const noexcept { return currentModelIndex; }
 
-    void trigger (const ModelParams& params, float velocity, uint32_t seed)
+    void trigger (const ModelParams& params, uint32_t seed)
     {
         if (activeEngine == nullptr)
             return;
@@ -136,7 +136,7 @@ public:
             declickRemaining = 0;
         }
 
-        activeEngine->trigger (params, velocity, seed);
+        activeEngine->trigger (params, seed);
         triggerCounter.fetch_add (1, std::memory_order_relaxed);
     }
 
