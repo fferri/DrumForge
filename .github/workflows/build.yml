@@ -1,0 +1,132 @@
+name: Build
+
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  JUCE_VERSION: "9.0.3"
+
+jobs:
+  #=============================================================================
+  # macOS: a universal binary, so the same download runs on Intel and Apple
+  # Silicon. macos-14 runners are arm64 and carry both SDK slices.
+  #=============================================================================
+  macos:
+    name: macOS (universal)
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # JUCE is a subdirectory that is not committed, and fetching it takes longer
+      # than the build does.
+      - name: Cache JUCE
+        id: juce-cache
+        uses: actions/cache@v4
+        with:
+          path: JUCE
+          key: juce-${{ env.JUCE_VERSION }}-macos
+
+      - name: Fetch JUCE
+        if: steps.juce-cache.outputs.cache-hit != 'true'
+        run: git clone --depth 1 --branch "$JUCE_VERSION" https://github.com/juce-framework/JUCE.git JUCE
+
+      - name: Configure
+        run: >-
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
+
+      - name: Build
+        run: cmake --build build --parallel 3
+
+      - name: Verify
+        run: ./build/DrumForgeTests_artefacts/Release/DrumForgeTests
+
+      - name: Package
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            build/DrumForge_artefacts/Release/VST3/DrumForge.vst3 \
+            DrumForge-macOS-universal.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DrumForge-macOS-universal
+          path: DrumForge-macOS-universal.zip
+          if-no-files-found: error
+
+  #=============================================================================
+  # Windows: x64 only. A VST3 bundle there is a directory holding the actual
+  # .vst3 binary, which is why the packaging step archives the directory.
+  #=============================================================================
+  windows:
+    name: Windows (x64)
+    runs-on: windows-2022
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache JUCE
+        id: juce-cache
+        uses: actions/cache@v4
+        with:
+          path: JUCE
+          key: juce-${{ env.JUCE_VERSION }}-windows
+
+      - name: Fetch JUCE
+        if: steps.juce-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: git clone --depth 1 --branch "$JUCE_VERSION" https://github.com/juce-framework/JUCE.git JUCE
+
+      - name: Configure
+        run: cmake -B build -G "Visual Studio 17 2022" -A x64
+
+      - name: Build
+        run: cmake --build build --config Release --parallel 3
+
+      - name: Verify
+        run: build\DrumForgeTests_artefacts\Release\DrumForgeTests.exe
+
+      - name: Package
+        shell: pwsh
+        run: >
+          7z a -tzip DrumForge-Windows-x64.zip
+          build\DrumForge_artefacts\Release\VST3\DrumForge.vst3
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DrumForge-Windows-x64
+          path: DrumForge-Windows-x64.zip
+          if-no-files-found: error
+
+  #=============================================================================
+  # Tagging is what turns a build into a download. Both platforms are attached
+  # to one release, so this waits for them.
+  #=============================================================================
+  release:
+    name: Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [macos, windows]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+          gh release upload "$GITHUB_REF_NAME" $(find dist -name '*.zip') --clobber

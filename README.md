@@ -379,6 +379,29 @@ cp -R build/DrumForge_artefacts/Release/VST3/DrumForge.vst3 ~/Library/Audio/Plug
 Then rescan plugins in your DAW. DrumForge appears as an instrument named **DrumForge**
 under the *Drum* category.
 
+### Prebuilt packages
+
+ builds both platforms on every push and attaches the result
+to the run as a downloadable artifact:
+
+| Platform | Artifact |
+|---|---|
+| macOS |  — one binary for Intel and Apple Silicon |
+| Windows |  |
+
+Pushing a tag starting with  turns a build into a release, with both packages attached
+and notes generated from the commits:
+
+
+
+Each build also runs the offline test suite, so a package is only produced if the engines,
+kits and state handling all pass on that platform.
+
+**The macOS package is not code-signed or notarised**, which requires an Apple Developer
+account. Most DAWs load it regardless, but Gatekeeper may warn on first use and stricter
+hosts may refuse it. Signing and notarisation can be added to the workflow with repository
+secrets if a Developer ID is available.
+
 ## Verifying
 
 ```sh
