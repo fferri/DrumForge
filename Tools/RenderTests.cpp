@@ -41,14 +41,17 @@ void check (bool condition, const juce::String& name, const juce::String& detail
     if (detail.isNotEmpty())
         std::cout << "   [" << detail.toStdString() << "]";
 
-    std::cout << "\n";
+    // Flushed immediately, not left to the buffer. Under CI stdout is a pipe, so it is
+    // block-buffered: if the suite dies partway through, everything since the last flush
+    // disappears - and that is precisely the output that says where it died.
+    std::cout << std::endl;
 
     condition ? ++passed : ++failed;
 }
 
 void section (const juce::String& title)
 {
-    std::cout << "\n" << title.toStdString() << "\n";
+    std::cout << "\n" << title.toStdString() << std::endl;
 }
 
 void setParameter (DrumKitProcessor& processor, const juce::String& id, float value)

@@ -58,7 +58,11 @@ jobs:
             # GitHub turns ::error:: lines into check-run annotations, and annotations are
             # readable through the API without repository admin rights. Job logs are not.
             # Without this a failure is only visible to whoever can open the web UI.
-            tail -n 40 verify.log | while IFS= read -r line; do
+            grep -n "FAIL" verify.log | head -12 | while IFS= read -r line; do
+              echo "::error::${line//%/%25}"
+            done
+            echo "::error::=== last lines before exit ==="
+            tail -n 4 verify.log | while IFS= read -r line; do
               echo "::error::${line//%/%25}"
             done
             echo "::error::the test suite exited $status"
@@ -118,7 +122,11 @@ jobs:
             # GitHub turns ::error:: lines into check-run annotations, and annotations are
             # readable through the API without repository admin rights. Job logs are not.
             # Without this a failure is only visible to whoever can open the web UI.
-            tail -n 40 verify.log | while IFS= read -r line; do
+            grep -n "FAIL" verify.log | head -12 | while IFS= read -r line; do
+              echo "::error::${line//%/%25}"
+            done
+            echo "::error::=== last lines before exit ==="
+            tail -n 4 verify.log | while IFS= read -r line; do
               echo "::error::${line//%/%25}"
             done
             echo "::error::the test suite exited $status"
