@@ -295,6 +295,15 @@ KitData KitLibrary::getKit (int index) const
     return userKits[(size_t) userIndex].data;
 }
 
+int KitLibrary::indexOfName (const juce::String& name) const
+{
+    for (int i = 0; i < getNumKits(); ++i)
+        if (getName (i) == name)
+            return i;
+
+    return -1;
+}
+
 juce::Result KitLibrary::saveKit (const KitData& kit)
 {
     const auto name = kit.name.trim();
@@ -327,8 +336,11 @@ juce::Result KitLibrary::deleteKit (int index)
 
     const auto file = userKits[(size_t) userIndex].file;
 
-    if (! file.deleteFile())
-        return juce::Result::fail ("Could not delete " + file.getFullPathName());
+    // To the trash, not gone: a mis-click on a kit you spent an hour on has to be
+    // recoverable, and deleting a file is not an undoable action.
+    if (! file.moveToTrash())
+        if (! file.deleteFile())
+            return juce::Result::fail ("Could not delete " + file.getFullPathName());
 
     rescan();
     return juce::Result::ok();

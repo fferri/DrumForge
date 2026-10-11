@@ -8,23 +8,21 @@ DrumKitEditor::DrumKitEditor (DrumKitProcessor& owner)
 {
     setLookAndFeel (&lookAndFeel);
 
-    // ---- Factory kit selector -----------------------------------------------
-    for (int i = 0; i < numKitPresets(); ++i)
-        kitBox.addItem (kitPreset (i).name, i + 1);
+    // ---- Kit browser --------------------------------------------------------
+    kitButton.setTooltip ("Browse kits. Built-in kits are always available and cannot be\n"
+                          "changed, so you can always get back to them; saving makes an\n"
+                          "editable copy of your own.");
+    kitButton.onClick = [this] { showKitMenu(); };
+    addAndMakeVisible (kitButton);
 
-    kitBox.setTooltip ("Factory kit. Loads each track's engine, distortion curve,\n"
-                       "tuning and level in one go. Every track stays editable afterwards.");
-    kitBox.onChange = [this]
-    {
-        const int selected = kitBox.getSelectedId() - 1;
+    saveKitButton.setTooltip ("Save everything currently dialled in - including velocity\n"
+                              "depths - as a kit of your own.");
+    saveKitButton.onClick = [this] { saveCurrentKitAs(); };
+    addAndMakeVisible (saveKitButton);
 
-        if (selected >= 0 && selected != displayedKit)
-            commitKitSelection (selected);
-    };
-
-    displayedKit = kit().getSelectedKit();
-    kitBox.setSelectedId (displayedKit + 1, juce::dontSendNotification);
-    addAndMakeVisible (kitBox);
+    currentKitIndex = kit().getSelectedKit();
+    lastSeenKitParameter = currentKitIndex;
+    refreshKitButton();
 
     // ---- Modulation mode ----------------------------------------------------
     modButton.setClickingTogglesState (true);
@@ -132,9 +130,13 @@ void DrumKitEditor::resized()
     auto header = headerArea.reduced (10, 4);
     titleArea = header.removeFromLeft (330).reduced (8, 0);
 
-    auto kitSlot = header.removeFromLeft (juce::jmin (200, header.getWidth() / 3));
+    auto kitSlot = header.removeFromLeft (juce::jmin (240, header.getWidth() / 3));
     kitCaptionArea = kitSlot.removeFromTop (kitSlot.getHeight() / 2).reduced (2, 0);
-    kitBox.setBounds (kitSlot.reduced (2, 2));
+
+    auto kitRow = kitSlot.reduced (2, 2);
+    saveKitButton.setBounds (kitRow.removeFromRight (46));
+    kitRow.removeFromRight (4);
+    kitButton.setBounds (kitRow);
 
     modArea = header.removeFromLeft (66).reduced (6, 18);
     modButton.setBounds (modArea);
@@ -161,26 +163,143 @@ void DrumKitEditor::resized()
                                        stripsArea.getHeight());
 }
 
-void DrumKitEditor::commitKitSelection (int kitIndex)
+void DrumKitEditor::showKitMenu()
 {
-    if (auto* parameter = kit().apvts.getParameter (pid::kit))
-        parameter->setValueNotifyingHost (parameter->convertTo0to1 ((float) kitIndex));
+    juce::PopupMenu menu;
 
-    displayedKit = kitIndex;
-    kit().applyKitPreset (kitIndex);
+    const int userStart = numFactoryKits();
 
-    // The strips notice their new engines and distortion curves on the next tick.
+    menu.addSectionHeader ("Built-in");
+    for (int i = 0; i < userStart; ++i)
+        menu.addItem (1000 + i, library.getName (i), true, i == currentKitIndex);
+
+    if (library.getNumKits() > userStart)
+    {
+        menu.addSectionHeader ("My kits");
+        for (int i = userStart; i < library.getNumKits(); ++i)
+            menu.addItem (1000 + i, library.getName (i), true, i == currentKitIndex);
+    }
+
+    menu.addSeparator();
+    menu.addItem (1, "Save current settings as a kit...");
+
+    if (! library.isFactoryKit (currentKitIndex))
+    {
+        menu.addSeparator();
+        menu.addItem (3, "Delete \"" + library.getName (currentKitIndex) + "\"");
+    }
+
+    menu.addItem (2, "Show kits folder");
+
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (kitButton),
+                        [this] (int result) { handleKitMenuResult (result); });
+}
+
+void DrumKitEditor::handleKitMenuResult (int result)
+{
+    if (result >= 1000)
+    {
+        loadKit (result - 1000);
+        return;
+    }
+
+    switch (result)
+    {
+        case 1:  saveCurrentKitAs();  break;
+        case 2:  library.getUserDirectory().createDirectory();
+                 library.getUserDirectory().revealToUser();
+                 break;
+        case 3:  deleteCurrentKit();  break;
+        default: break;
+    }
+}
+
+void DrumKitEditor::loadKit (int index)
+{
+    if (! juce::isPositiveAndBelow (index, library.getNumKits()))
+        return;
+
+    if (library.isFactoryKit (index))
+    {
+        // levelOnly, so a built-in kit sets the dynamics but leaves the tone depths you
+        // have dialled alone.
+        kit().applyKitPreset (index);
+        lastSeenKitParameter = index;
+    }
+    else
+    {
+        // A kit you saved is a complete snapshot, so every depth comes back with it.
+        applyKit (kit(), library.getKit (index), DepthPolicy::replaceAll);
+    }
+
+    currentKitIndex = index;
+    refreshKitButton();
+}
+
+void DrumKitEditor::saveCurrentKitAs()
+{
+    const auto suggested = juce::isPositiveAndBelow (currentKitIndex, library.getNumKits())
+                             ? library.getName (currentKitIndex) + " Copy"
+                             : juce::String ("My Kit");
+
+    auto* window = new juce::AlertWindow ("Save kit",
+                                          "Save everything currently dialled in as a kit:",
+                                          juce::MessageBoxIconType::NoIcon);
+    window->addTextEditor ("name", suggested, "Name:");
+    window->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
+    window->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+
+    window->enterModalState (true,
+        juce::ModalCallbackFunction::create ([this, window] (int result)
+        {
+            if (result != 1)
+                return;
+
+            const auto snapshot = captureKit (kit(), window->getTextEditorContents ("name"));
+
+            if (const auto saved = library.saveKit (snapshot); saved.failed())
+            {
+                juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                                                  .withIconType (juce::MessageBoxIconType::WarningIcon)
+                                                  .withTitle ("Could not save kit")
+                                                  .withMessage (saved.getErrorMessage())
+                                                  .withButton ("OK"),
+                                              nullptr);
+                return;
+            }
+
+            currentKitIndex = library.indexOfName (snapshot.name);
+            refreshKitButton();
+        }),
+        true);
+}
+
+void DrumKitEditor::deleteCurrentKit()
+{
+    if (library.isFactoryKit (currentKitIndex))
+        return;
+
+    library.deleteKit (currentKitIndex);
+
+    // The sound is still loaded, it just no longer corresponds to anything on disk.
+    currentKitIndex = -1;
+    refreshKitButton();
+}
+
+void DrumKitEditor::refreshKitButton()
+{
+    kitButton.setButtonText (juce::isPositiveAndBelow (currentKitIndex, library.getNumKits())
+                               ? library.getName (currentKitIndex)
+                               : juce::String ("(unsaved)"));
 }
 
 void DrumKitEditor::timerCallback()
 {
     // Polled rather than driven by an attachment: restoring a session changes the kit
-    // parameter, and that must not re-apply the preset over the restored values.
-    if (const int selected = kit().getSelectedKit(); selected != displayedKit)
-    {
-        displayedKit = selected;
-        kitBox.setSelectedId (selected + 1, juce::dontSendNotification);
-    }
+    // parameter, and that must not re-apply the preset over the restored values. Only a
+    // change we did not make ourselves - automation, or a session load - gets acted on.
+    if (const int selected = kit().getSelectedKit(); selected != lastSeenKitParameter)
+        loadKit (selected);
 
     for (auto& strip : strips)
         strip->updateFromProcessor();

@@ -163,8 +163,24 @@ that one respect — they set the engines, the values and the level depth, but l
 depths on the tone and envelope knobs alone. That difference is explicit in the code rather
 than accidental: `applyKit` takes a `DepthPolicy` and the two callers pass different values.
 
-*The data layer, file format and library are in place; the in-editor browser that drives
-them is the next piece of work.*
+Click the kit name in the header to browse. Built-in kits and your own appear in one list.
+
+**The built-in kits are read-only, and deliberately not copied to disk.** That choice has a
+consequence worth knowing: because they live in the binary rather than as files, a later
+version of DrumForge can improve them and you get the improvement automatically. Had they
+been written out as files on first run, updating the plugin would leave you with a stale
+copy and a name clash — and "restore the factory kits" would have to exist purely to undo
+what that first run did. Nothing to restore is better than a restore command.
+
+**Saving always makes a kit of your own.** With a built-in kit loaded, Save pre-fills
+"<name> Copy", so turning a factory kit into an editable one is one click. Your own kits
+can be saved over themselves, and deleting one moves it to the trash rather than
+destroying it.
+
+The kit parameter that hosts can automate still refers to the built-in kits only. Loading
+one of your kits from the browser changes the sound without touching that parameter, and if
+a host or a session then moves it, the editor notices and loads the built-in kit — so
+automation and browsing never fight.
 
 ---
 
@@ -223,7 +239,7 @@ Source/
   PluginEntry.cpp         createPluginFilter()
 Tools/
   RenderDemo.cpp          offline WAV renderer
-  RenderTests.cpp         offline verification suite (227 checks)
+  RenderTests.cpp         offline verification suite (230 checks)
   RenderScreenshot.cpp    editor smoke test / screenshot generator
   HostLoadTest.cpp        loads the built .vst3 through a real VST3 host (22 checks)
 ```
@@ -306,7 +322,7 @@ under the *Drum* category.
 
 ```sh
 cmake --build build
-./build/DrumForgeTests_artefacts/Release/DrumForgeTests              # 227 checks
+./build/DrumForgeTests_artefacts/Release/DrumForgeTests              # 230 checks
 ./build/DrumForgeHostTest_artefacts/Release/DrumForgeHostTest.app/Contents/MacOS/DrumForgeHostTest   # 22 checks
 ./build/DrumForgeScreenshot_artefacts/Release/DrumForgeScreenshot.app/Contents/MacOS/DrumForgeScreenshot docs/screenshot.png
 ./build/DrumForgeRender_artefacts/Release/DrumForgeRender renders    # writes WAVs you can listen to

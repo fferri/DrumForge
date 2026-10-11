@@ -85,7 +85,10 @@ public:
     /** Saves a kit as a user kit. An existing user kit with the same name is replaced. */
     juce::Result saveKit (const KitData& kit);
 
-    /** Deletes a user kit. Factory kits cannot be removed. */
+    /** Index of a kit by name, or -1. Names are unique within the library. */
+    int indexOfName (const juce::String& name) const;
+
+    /** Removes a user kit by moving it to the trash. Factory kits cannot be removed. */
     juce::Result deleteKit (int index);
 
     /** Re-reads the user directory. */

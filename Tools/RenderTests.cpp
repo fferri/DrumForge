@@ -1241,6 +1241,11 @@ void testKitLibrary()
            juce::String (reopened.getNumKits()) + " kits");
     check (near (reopened.getKit (numFactoryKits()).tracks[0].decay, 0.11f), "with the new content");
 
+    check (reopened.indexOfName ("My Kit / 01") == numFactoryKits(),
+           "a kit can be found by name", juce::String (reopened.indexOfName ("My Kit / 01")));
+    check (reopened.indexOfName ("Warehouse") == 1, "including factory kits");
+    check (reopened.indexOfName ("No Such Kit") == -1, "and a missing name reports -1");
+
     check (library.saveKit (KitData {}).failed(), "a kit with no name is refused");
     check (reopened.deleteKit (numFactoryKits()).wasOk(), "a user kit can be deleted");
     check (reopened.getNumKits() == numFactoryKits(), "and is gone");
