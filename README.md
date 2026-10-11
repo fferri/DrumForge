@@ -408,7 +408,7 @@ secrets if a Developer ID is available.
 cmake --build build
 ./build/DrumForgeTests_artefacts/Release/DrumForgeTests              # 427 checks
 ./build/DrumForgeHostTest_artefacts/Release/DrumForgeHostTest.app/Contents/MacOS/DrumForgeHostTest   # 23 checks
-./build/DrumForgeScreenshot_artefacts/Release/DrumForgeScreenshot.app/Contents/MacOS/DrumForgeScreenshot docs/screenshot.png
+./build/DrumForgeScreenshot_artefacts/Release/DrumForgeScreenshot docs/screenshot.png
 ./build/DrumForgeRender_artefacts/Release/DrumForgeRender renders    # writes WAVs you can listen to
 ```
 

@@ -86,7 +86,13 @@ target_sources(DrumForgeTests PRIVATE Tools/RenderTests.cpp)
 target_link_libraries(DrumForgeTests PRIVATE DrumForgeCore)
 
 # GUI smoke test: constructs the real editor and renders it to a PNG.
-juce_add_gui_app(DrumForgeScreenshot PRODUCT_NAME "DrumForgeScreenshot")
+#
+# A console app, not a gui_app, even though it drives the GUI. On Windows a gui_app target
+# links with /SUBSYSTEM:WINDOWS, which needs WinMain - and only a JUCEApplication built with
+# START_JUCE_APPLICATION provides one. This tool has a plain main(), so a gui_app target
+# fails to link there. It is a command-line tool that renders offscreen, so the console
+# subsystem is also the honest description of what it is.
+juce_add_console_app(DrumForgeScreenshot PRODUCT_NAME "DrumForgeScreenshot")
 target_sources(DrumForgeScreenshot PRIVATE Tools/RenderScreenshot.cpp)
 target_link_libraries(DrumForgeScreenshot PRIVATE DrumForgeCore)
 
