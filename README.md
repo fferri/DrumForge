@@ -239,7 +239,7 @@ Source/
   PluginEntry.cpp         createPluginFilter()
 Tools/
   RenderDemo.cpp          offline WAV renderer
-  RenderTests.cpp         offline verification suite (230 checks)
+  RenderTests.cpp         offline verification suite (245 checks)
   RenderScreenshot.cpp    editor smoke test / screenshot generator
   HostLoadTest.cpp        loads the built .vst3 through a real VST3 host (22 checks)
 ```
@@ -263,6 +263,9 @@ Design points worth knowing:
   level/pan/drive/send.
 - **Master soft clipper** guarantees the output never exceeds full scale, however densely
   the kit is played.
+- **Randomising is constrained, not uniform.** The sweet-spot table in `Randomizer.cpp` is
+  the ranges the twenty factory kits actually live in. It is the difference between a
+  randomiser you leave installed and one you use twice.
 - **Velocity enters the system in exactly one place.** The engines no longer read it at all;
   it reaches them only as already-modulated parameter values, which is what makes the
   behaviour adjustable instead of hard-coded.
@@ -289,6 +292,23 @@ Each track strip, top to bottom:
 
 Every one of those nine knobs accepts a velocity depth. The globals in the top bar
 (`Master` and the reverb) do not, because there is no per-hit meaning to attach to them.
+
+**`RND`** rolls a new machine for that track. It is deliberately constrained rather than
+uniform, because a uniform draw over nine parameters mostly produces mud: each engine
+carries a sweet-spot range per macro (a kick with no sweep is a click, rumble below about
+0.4 is not rumble), tuning moves by musical intervals rather than freely so it cannot beat
+against the rest of the kit, and pan and send stay modest.
+
+**Level, mute and solo are never touched.** They are mix decisions, and randomising them
+would wreck the balance of the kit you are working in — the one change you cannot hear your
+way back from. The engine *is* rerolled, but kept in role: track 1 only ever gets a
+kick-family engine, and the last two only hats and cymbals, so the GM note map still makes
+sense afterwards.
+
+The button is per machine on purpose. Rolling all eight at once is possible via the
+`DrumForgeKitLab random` tool, but it drifts a kit noticeably brighter — bright engines
+outnumber dark ones in the open middle slots — so one machine at a time is the better
+instrument.
 
 The top bar holds the **Kit** selector, the global `Master` level and the shared reverb
 (`Size`, `Damp`, `Mix`, `Width`). `Send` on each track feeds that reverb bus post-fader.
@@ -322,7 +342,7 @@ under the *Drum* category.
 
 ```sh
 cmake --build build
-./build/DrumForgeTests_artefacts/Release/DrumForgeTests              # 230 checks
+./build/DrumForgeTests_artefacts/Release/DrumForgeTests              # 245 checks
 ./build/DrumForgeHostTest_artefacts/Release/DrumForgeHostTest.app/Contents/MacOS/DrumForgeHostTest   # 22 checks
 ./build/DrumForgeScreenshot_artefacts/Release/DrumForgeScreenshot.app/Contents/MacOS/DrumForgeScreenshot docs/screenshot.png
 ./build/DrumForgeRender_artefacts/Release/DrumForgeRender renders    # writes WAVs you can listen to
@@ -339,7 +359,10 @@ at 100, is symmetric and is monotonic; that depth 0 is an exact bypass at any ve
 nominal hit is bit-identical whatever the depth; that modulation clamps rather than wraps;
 and that depths survive a session save while a session without them clears any leftovers;
 that a kit captures and restores every parameter and every depth while a factory kit leaves
-your tone depths alone; that kits survive XML and a round-trip through the filesystem, that
+your tone depths alone; that the randomiser leaves level, mute and solo untouched across
+fifty rolls, keeps every engine in role over three hundred, never rolls an engine a value
+that stops it being itself, and produces finite audible output from thirty consecutive
+rolls; that kits survive XML and a round-trip through the filesystem, that
 re-saving replaces rather than duplicates, and that a name full of filename-hostile
 characters still works;
 that the band the editor draws spans exactly the range the audio path applies, including on

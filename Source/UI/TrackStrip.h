@@ -6,6 +6,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #include "../Core/DrumKitProcessor.h"
+#include "../Core/Randomizer.h"
 #include "ModelKnob.h"
 #include "Theme.h"
 #include "UiState.h"
@@ -72,14 +73,18 @@ private:
     juce::ComboBox distBox;
     PadButton pad;
     juce::TextButton muteButton { "M" }, soloButton { "S" };
+    juce::TextButton randomiseButton { "RND" };
 
     std::unique_ptr<ModelKnob> decayKnob, toneKnob, characterKnob, sweepKnob;
     std::unique_ptr<ModelKnob> tuneKnob, levelKnob, panKnob, driveKnob, sendKnob;
 
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> muteAttachment, soloAttachment;
+
+    /** Advances on every press, so repeated randomising keeps giving new machines. */
+    Rng randomRng;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> distAttachment;
 
-    juce::Rectangle<int> headerArea, padArea, meterArea, comboArea, distArea, macroArea, utilArea;
+    juce::Rectangle<int> headerArea, headerButtonArea, padArea, meterArea, comboArea, distArea, macroArea, utilArea;
 
     juce::String noteLabel;
     int displayedModel = -1;

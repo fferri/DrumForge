@@ -10,6 +10,7 @@
 */
 
 #include <algorithm>
+#include <set>
 #include <cmath>
 #include <iostream>
 #include <vector>
@@ -18,6 +19,7 @@
 
 #include "Core/DrumKitProcessor.h"
 #include "Core/KitLibrary.h"
+#include "Core/Randomizer.h"
 
 using namespace df;
 
@@ -1253,6 +1255,163 @@ void testKitLibrary()
     directory.deleteRecursively();
 }
 
+void testRandomiser()
+{
+    section ("Randomise: constrained, not chaotic");
+
+    const auto near = [] (float a, float b, float tolerance = 1.0e-4f)
+    {
+        return std::abs (a - b) < tolerance;
+    };
+
+    DrumKitProcessor processor;
+    processor.prepareToPlay (sampleRate, blockSize);
+
+    Rng rng { 12345u };
+
+    // ---- what must never move ---------------------------------------------
+    setParameter (processor, pid::track (3, pid::level), -12.5f);
+    setParameter (processor, pid::track (3, pid::mute), 1.0f);
+    setParameter (processor, pid::track (3, pid::solo), 0.0f);
+
+    for (int i = 0; i < 50; ++i)
+        randomiseTrack (processor, 3, rng);
+
+    check (near (readParameter (processor, pid::track (3, pid::level)), -12.5f, 0.01f),
+           "level survives 50 rolls - it is a mix decision, not a sound one",
+           juce::String (readParameter (processor, pid::track (3, pid::level)), 2));
+    check (readParameter (processor, pid::track (3, pid::mute)) > 0.5f, "mute survives");
+    check (readParameter (processor, pid::track (3, pid::solo)) < 0.5f, "solo survives");
+
+    // ---- the engine stays in role -----------------------------------------
+    bool kickRoleHeld = true, hatRoleHeld = true;
+    std::set<int> middleEngines;
+
+    for (int i = 0; i < 300; ++i)
+    {
+        randomiseTrack (processor, 0, rng);
+        const int k = (int) std::lround (readParameter (processor, pid::track (0, pid::model)));
+        kickRoleHeld = kickRoleHeld && (k == (int) ModelId::kick || k == (int) ModelId::membrane);
+
+        randomiseTrack (processor, 6, rng);
+        const int h = (int) std::lround (readParameter (processor, pid::track (6, pid::model)));
+        hatRoleHeld = hatRoleHeld && (h == (int) ModelId::metal || h == (int) ModelId::cymbal
+                                        || h == (int) ModelId::clang);
+
+        randomiseTrack (processor, 3, rng);
+        middleEngines.insert ((int) std::lround (readParameter (processor, pid::track (3, pid::model))));
+    }
+
+    check (kickRoleHeld, "track 1 only ever rolls a kick-family engine");
+    check (hatRoleHeld, "tracks 7-8 only ever roll hats and cymbals");
+    check ((int) middleEngines.size() >= 6, "the middle tracks reach most of the engine set",
+           juce::String ((int) middleEngines.size()) + " distinct engines in 300 rolls");
+
+    // ---- engine-specific sweet spots --------------------------------------
+    // The point of the constraints is that an engine never rolls a value that stops it
+    // being itself. Rumble below ~0.4 is not rumble, and metal with its metallic macro
+    // low is just noise.
+    bool rumbleKeepsLength = true, metalKeepsMetallic = true, kickKeepsClick = true;
+    bool allInRange = true;
+
+    for (int i = 0; i < 500; ++i)
+    {
+        randomiseTrack (processor, 3, rng);
+
+        const int model = (int) std::lround (readParameter (processor, pid::track (3, pid::model)));
+        const float decay     = readParameter (processor, pid::track (3, pid::decay));
+        const float tone      = readParameter (processor, pid::track (3, pid::tone));
+        const float character = readParameter (processor, pid::track (3, pid::character));
+        const float sweep     = readParameter (processor, pid::track (3, pid::sweep));
+        const float drive     = readParameter (processor, pid::track (3, pid::drive));
+        const float send      = readParameter (processor, pid::track (3, pid::send));
+        const float pan       = readParameter (processor, pid::track (3, pid::pan));
+
+        if (model == (int) ModelId::rumble && decay < 0.35f)     rumbleKeepsLength = false;
+        if (model == (int) ModelId::metal && character < 0.45f)  metalKeepsMetallic = false;
+        if (model == (int) ModelId::kick && sweep < 0.15f)       kickKeepsClick = false;
+
+        for (float v : { decay, tone, character, sweep, drive, send })
+            allInRange = allInRange && v >= 0.0f && v <= 1.0f;
+
+        allInRange = allInRange && pan >= -1.0f && pan <= 1.0f;
+    }
+
+    check (rumbleKeepsLength, "rumble never rolls a decay short enough to stop being rumble");
+    check (metalKeepsMetallic, "metal never rolls its metallic macro down into noise");
+    check (kickKeepsClick, "kick always keeps some sweep, so it still has a click");
+    check (allInRange, "every rolled value stays inside its parameter's range");
+
+    // Pan is deliberately restrained; a hard-panned machine is disorienting.
+    bool panRestrained = true;
+    for (int i = 0; i < 200; ++i)
+    {
+        randomiseTrack (processor, 3, rng);
+        panRestrained = panRestrained && std::abs (readParameter (processor, pid::track (3, pid::pan))) <= 0.51f;
+    }
+    check (panRestrained, "pan stays within a moderate width");
+
+    // ---- determinism -------------------------------------------------------
+    const auto roll = [] (uint32_t seed)
+    {
+        DrumKitProcessor p;
+        p.prepareToPlay (sampleRate, blockSize);
+        Rng r { seed };
+        randomiseTrack (p, 2, r);
+
+        return std::array<float, 6> {
+            readParameter (p, pid::track (2, pid::model)),
+            readParameter (p, pid::track (2, pid::decay)),
+            readParameter (p, pid::track (2, pid::tone)),
+            readParameter (p, pid::track (2, pid::character)),
+            readParameter (p, pid::track (2, pid::drive)),
+            readParameter (p, pid::track (2, pid::send)),
+        };
+    };
+
+    const auto identical = [] (const std::array<float, 6>& a, const std::array<float, 6>& b)
+    {
+        for (size_t i = 0; i < a.size(); ++i)
+            if (std::abs (a[i] - b[i]) > 1.0e-6f)
+                return false;
+
+        return true;
+    };
+
+    check (identical (roll (999u), roll (999u)), "the same seed rolls the same machine");
+    check (! identical (roll (999u), roll (1000u)), "a different seed rolls a different one");
+
+    // ---- and it makes a sound ---------------------------------------------
+    DrumKitProcessor voice;
+    voice.prepareToPlay (sampleRate, blockSize);
+    setParameter (voice, pid::track (0, pid::level), -6.0f);
+
+    int finite = 0, audible = 0;
+    float quietest = 1.0f;
+
+    for (int i = 0; i < 30; ++i)
+    {
+        randomiseTrack (voice, 0, rng);
+
+        std::vector<Event> events;
+        events.emplace_back (0.05, juce::MidiMessage::noteOn (1, primaryNoteForTrack (0),
+                                                              (juce::uint8) 110));
+
+        const auto audio = renderEvents (voice, events, 1.0);
+        const float peak = audio.getMagnitude (0, audio.getNumSamples());
+
+        if (isFinite (audio)) ++finite;
+        if (peak > 0.01f)     ++audible;
+
+        quietest = juce::jmin (quietest, peak);
+    }
+
+    check (finite == 30, "every randomised machine renders finite audio",
+           juce::String (finite) + "/30");
+    check (audible == 30, "and every one of them is audible",
+           "quietest " + juce::String (juce::Decibels::gainToDecibels (quietest, -100.0f), 1) + " dBFS");
+}
+
 } // namespace
 
 int main()
@@ -1282,6 +1441,7 @@ int main()
     testModulationStatePersistence();
     testKitDynamics();
     testKitLibrary();
+    testRandomiser();
 
     std::cout << "\n============================\n"
               << passed << " passed, " << failed << " failed\n";

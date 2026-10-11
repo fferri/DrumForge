@@ -23,6 +23,7 @@
 
 #include "Core/DrumKitProcessor.h"
 #include "Core/KitLibrary.h"
+#include "Core/Randomizer.h"
 
 using namespace df;
 
@@ -233,6 +234,44 @@ int doExport (const juce::File& directory)
     return 0;
 }
 
+/** Rolls every machine on every track, for stress-testing the randomiser. */
+int doRandom (int count, const juce::String& lanePrefix, const juce::File& outputDirectory)
+{
+    if (const auto created = outputDirectory.createDirectory(); created.failed())
+    {
+        std::cerr << "cannot create " << outputDirectory.getFullPathName() << ": "
+                  << created.getErrorMessage() << "\n";
+        return 1;
+    }
+
+    DrumKitProcessor processor;
+    processor.prepareToPlay (sampleRate, blockSize);
+
+    Rng rng { (uint32_t) juce::Time::getMillisecondCounter() };
+
+    for (int i = 0; i < count; ++i)
+    {
+        for (int track = 0; track < kNumTracks; ++track)
+            randomiseTrack (processor, track, rng);
+
+        const auto name = lanePrefix.toUpperCase() + "-"
+                            + juce::String (i + 1).paddedLeft ('0', 2) + " Random";
+
+        const auto kit = captureKit (processor, name);
+        const auto file = outputDirectory.getChildFile (name.replace (" ", "_") + ".dfkit");
+        const auto xml = kitToXml (kit);
+
+        if (xml == nullptr || ! xml->writeTo (file))
+        {
+            std::cerr << "failed to write " << file.getFullPathName() << "\n";
+            return 1;
+        }
+    }
+
+    std::cout << "wrote " << count << " randomised " << lanePrefix << " kit(s)\n";
+    return 0;
+}
+
 int doRender (const juce::File& kitDirectory, const juce::File& outputDirectory)
 {
     if (const auto created = outputDirectory.createDirectory(); created.failed())
@@ -318,7 +357,8 @@ int main (int argc, char** argv)
     {
         std::cout << "usage:\n"
                      "  DrumForgeKitLab export <directory>\n"
-                     "  DrumForgeKitLab render <kitDirectory> <outputDirectory>\n";
+                     "  DrumForgeKitLab render <kitDirectory> <outputDirectory>\n"
+                     "  DrumForgeKitLab random <count> <lane> <outputDirectory>\n";
         return 1;
     }
 
@@ -326,6 +366,17 @@ int main (int argc, char** argv)
 
     if (command == "export")
         return doExport (juce::File (arguments[2]));
+
+    if (command == "random")
+    {
+        if (arguments.size() < 5)
+        {
+            std::cerr << "random needs a count, a lane prefix and an output directory\n";
+            return 1;
+        }
+
+        return doRandom (arguments[2].getIntValue(), arguments[3], juce::File (arguments[4]));
+    }
 
     if (command == "render")
     {

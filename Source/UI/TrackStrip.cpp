@@ -171,6 +171,20 @@ TrackStrip::TrackStrip (DrumKitProcessor& owner, int index, EditorUiState& state
     soloAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         processor.apvts, id (pid::solo), soloButton);
 
+    // ---- Randomise ----------------------------------------------------------
+    randomRng.seed (0x5f3759dfu ^ ((uint32_t) trackIndex * 0x9e3779b9u));
+
+    randomiseButton.setTooltip ("Roll a new machine for this track.\n"
+                                "Level, mute and solo are left alone so the kit's balance\n"
+                                "survives; the engine is kept in role, so track 1 stays kick\n"
+                                "and the last two stay hats and cymbals.");
+    randomiseButton.onClick = [this]
+    {
+        randomiseTrack (processor, trackIndex, randomRng);
+        repaint();
+    };
+    addAndMakeVisible (randomiseButton);
+
     noteLabel = juce::MidiMessage::getMidiNoteName (primaryNoteForTrack (trackIndex), true, true, 3)
                   + "  " + juce::String (primaryNoteForTrack (trackIndex));
 
@@ -283,8 +297,15 @@ void TrackStrip::resized()
 {
     auto area = getLocalBounds().reduced (4, 3);
 
-    headerArea = area.removeFromTop (15);
+    headerArea = area.removeFromTop (22);
     area.removeFromTop (3);
+
+    {
+        auto headerRow = headerArea;
+        headerButtonArea = headerRow.removeFromRight (40).reduced (1, 5);
+        randomiseButton.setBounds (headerButtonArea);
+        headerArea = headerRow;          // the header text lays out in what is left
+    }
 
     padArea = area.removeFromTop (juce::jlimit (26, 50, area.getHeight() / 9));
     area.removeFromTop (3);
