@@ -133,4 +133,13 @@ inline void readTrackState (const TrackParamRefs& refs, bool& muted, bool& soloe
     soloed = refs.solo->load() > 0.5f;
 }
 
+/** Writes a parameter, notifying the host so it records the change. Message thread only. */
+inline void setParameterValue (juce::AudioProcessorValueTreeState& state,
+                               const juce::String& parameterID,
+                               float value)
+{
+    if (auto* parameter = state.getParameter (parameterID))
+        parameter->setValueNotifyingHost (parameter->convertTo0to1 (value));
+}
+
 } // namespace df

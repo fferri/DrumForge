@@ -1,5 +1,7 @@
 #include "DrumKitProcessor.h"
 
+#include "KitLibrary.h"
+
 #include "UI/DrumKitEditor.h"
 
 namespace df
@@ -357,29 +359,14 @@ int DrumKitProcessor::getSelectedKit() const noexcept
 
 void DrumKitProcessor::applyKitPreset (int kitIndex)
 {
-    const auto& preset = kitPreset (kitIndex);
+    if (! juce::isPositiveAndBelow (kitIndex, numFactoryKits()))
+        return;
 
-    for (int t = 0; t < kNumTracks; ++t)
-    {
-        const auto& d = preset.tracks[t];
-        const auto id = [t] (const char* name) { return pid::track (t, name); };
+    setParameterValue (apvts, pid::kit, (float) kitIndex);
 
-        setParameterValue (apvts, id (pid::model),     (float) d.model);
-        setParameterValue (apvts, id (pid::dist),      (float) d.distMode);
-        setParameterValue (apvts, id (pid::level),     d.level);
-        setParameterValue (apvts, id (pid::pan),       d.pan);
-        setParameterValue (apvts, id (pid::tune),      d.tune);
-        setParameterValue (apvts, id (pid::decay),     d.decay);
-        setParameterValue (apvts, id (pid::tone),      d.tone);
-        setParameterValue (apvts, id (pid::character), d.character);
-        setParameterValue (apvts, id (pid::sweep),     d.sweep);
-        setParameterValue (apvts, id (pid::drive),     d.drive);
-        setParameterValue (apvts, id (pid::send),      d.send);
-
-        // A kit owns the velocity dynamics; the depths on the tone and envelope knobs
-        // belong to the player and deliberately survive a kit change.
-        modulation.setDepth (t, (int) ModTarget::level, d.levelDepth);
-    }
+    // levelOnly: a factory kit sets the velocity dynamics but leaves the depths the player
+    // has dialled on the tone and envelope knobs alone.
+    applyKit (*this, factoryKit (kitIndex), DepthPolicy::levelOnly);
 }
 
 juce::AudioProcessorEditor* DrumKitProcessor::createEditor()

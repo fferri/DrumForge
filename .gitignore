@@ -6,6 +6,10 @@ cmake-build-*/
 # Generated audio from DrumForgeRender
 renders/
 
+# Reference material for kit design. Third-party commercial recordings used only as
+# statistical targets - never imported into the plugin, and never committed.
+reference_samples/
+
 # JUCE is fetched separately; see README.md
 JUCE/
 

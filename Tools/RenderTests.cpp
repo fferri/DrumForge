@@ -17,6 +17,7 @@
 #include <juce_events/juce_events.h>
 
 #include "Core/DrumKitProcessor.h"
+#include "Core/KitLibrary.h"
 
 using namespace df;
 
@@ -50,6 +51,14 @@ void setParameter (DrumKitProcessor& processor, const juce::String& id, float va
 {
     if (auto* parameter = processor.apvts.getParameter (id))
         parameter->setValueNotifyingHost (parameter->convertTo0to1 (value));
+}
+
+float readParameter (DrumKitProcessor& processor, const juce::String& id)
+{
+    if (auto* value = processor.apvts.getRawParameterValue (id))
+        return value->load();
+
+    return std::numeric_limits<float>::quiet_NaN();
 }
 
 using Event = std::pair<double, juce::MidiMessage>;
@@ -1122,6 +1131,123 @@ void testKitDynamics()
     }
 }
 
+void testKitLibrary()
+{
+    section ("Kits: capture, apply, serialise, save");
+
+    const auto near = [] (float a, float b, float tolerance = 1.0e-4f)
+    {
+        return std::abs (a - b) < tolerance;
+    };
+
+    // ---- capture / apply round-trip ---------------------------------------
+    DrumKitProcessor source;
+    source.prepareToPlay (sampleRate, blockSize);
+    source.applyKitPreset (0);
+    source.setModulationDepth (3, (int) ModTarget::character, 0.42f);
+    source.setModulationDepth (6, (int) ModTarget::pan, -0.25f);
+    setParameter (source, pid::track (4, pid::tune), -7.5f);
+    setParameter (source, pid::track (2, pid::dist), (float) DistortionMode::fuzz);
+
+    const auto captured = captureKit (source, "Round Trip");
+    check (captured.name == "Round Trip", "a captured kit keeps its name");
+    check (near (captured.tracks[3].depths[(size_t) (int) ModTarget::character], 0.42f),
+           "capture records every modulation depth, not just level");
+
+    DrumKitProcessor restored;
+    restored.prepareToPlay (sampleRate, blockSize);
+    applyKit (restored, captured, DepthPolicy::replaceAll);
+
+    check (near (restored.getModulationDepth (3, (int) ModTarget::character), 0.42f),
+           "apply restores a character depth");
+    check (near (restored.getModulationDepth (6, (int) ModTarget::pan), -0.25f),
+           "apply restores a pan depth");
+    check (near (readParameter (restored, pid::track (4, pid::tune)), -7.5f, 0.01f),
+           "apply restores parameter values",
+           juce::String (readParameter (restored, pid::track (4, pid::tune)), 3));
+    check ((int) std::lround (readParameter (restored, pid::track (2, pid::dist)))
+             == (int) DistortionMode::fuzz,
+           "apply restores the distortion curve");
+
+    // ---- levelOnly must not stomp the player's expression ------------------
+    DrumKitProcessor expression;
+    expression.prepareToPlay (sampleRate, blockSize);
+    expression.setModulationDepth (1, (int) ModTarget::tone, 0.77f);
+    applyKit (expression, factoryKit (0), DepthPolicy::levelOnly);
+
+    check (near (expression.getModulationDepth (1, (int) ModTarget::tone), 0.77f),
+           "a factory kit leaves the tone depths you dialled alone");
+    check (expression.getModulationDepth (0, (int) ModTarget::level) > 0.01f,
+           "but it does set the level depth, which is the kit's dynamics");
+
+    // ---- XML round-trip ----------------------------------------------------
+    const auto xml = kitToXml (captured);
+    check (xml != nullptr && xml->hasTagName ("DRUMFORGE_KIT"), "a kit serialises to XML");
+
+    KitData reparsed;
+    check (kitFromXml (*xml, reparsed), "and parses back");
+    check (reparsed.name == captured.name, "the name survives");
+    check (near (reparsed.tracks[3].depths[(size_t) (int) ModTarget::character], 0.42f),
+           "depths survive serialisation");
+    check (near (reparsed.tracks[4].tune, -7.5f, 0.01f), "values survive serialisation");
+
+    juce::XmlElement wrong ("SOMETHING_ELSE");
+    KitData ignored;
+    check (! kitFromXml (wrong, ignored), "XML from something else is rejected");
+
+    // ---- factory kits are faithfully converted -----------------------------
+    for (int k = 0; k < numFactoryKits(); ++k)
+    {
+        const auto kit = factoryKit (k);
+        check (kit.name == kitPreset (k).name && ! kit.name.isEmpty(),
+               "factory kit " + juce::String (k) + " keeps its name", kit.name);
+        check (kit.tracks[0].model == kitPreset (k).tracks[0].model,
+               "factory kit " + juce::String (k) + " keeps its engines");
+    }
+
+    // ---- on disk -----------------------------------------------------------
+    auto directory = juce::File::getCurrentWorkingDirectory().getChildFile ("build/test-kits");
+    directory.deleteRecursively();
+
+    KitLibrary library (directory);
+    check (library.getNumKits() == numFactoryKits(),
+           "an empty library offers exactly the factory kits",
+           juce::String (library.getNumKits()) + " kits");
+    check (library.isFactoryKit (0), "the first entries are factory");
+    check (library.deleteKit (0).failed(), "factory kits cannot be deleted");
+
+    auto saved = captured;
+    saved.name = "My Kit / 01";          // deliberately awkward as a filename
+    check (library.saveKit (saved).wasOk(), "a kit can be saved");
+    check (library.getNumKits() == numFactoryKits() + 1, "and shows up in the library");
+    check (! library.isFactoryKit (numFactoryKits()), "as a user kit, not a factory one");
+    check (library.getName (numFactoryKits()) == "My Kit / 01",
+           "under the name it was given, unsanitised", library.getName (numFactoryKits()));
+
+    // A second library over the same directory must find it without being told.
+    KitLibrary reopened (directory);
+    check (reopened.getNumKits() == numFactoryKits() + 1, "a fresh library finds it on disk");
+
+    const auto loaded = reopened.getKit (numFactoryKits());
+    check (near (loaded.tracks[3].depths[(size_t) (int) ModTarget::character], 0.42f),
+           "and the reloaded kit still has its depths");
+    check (loaded.name == "My Kit / 01", "and its name");
+
+    // Saving under an existing name replaces rather than duplicates.
+    auto revised = loaded;
+    revised.tracks[0].decay = 0.11f;
+    check (reopened.saveKit (revised).wasOk(), "re-saving the same name works");
+    check (reopened.getNumKits() == numFactoryKits() + 1, "and replaces rather than duplicates",
+           juce::String (reopened.getNumKits()) + " kits");
+    check (near (reopened.getKit (numFactoryKits()).tracks[0].decay, 0.11f), "with the new content");
+
+    check (library.saveKit (KitData {}).failed(), "a kit with no name is refused");
+    check (reopened.deleteKit (numFactoryKits()).wasOk(), "a user kit can be deleted");
+    check (reopened.getNumKits() == numFactoryKits(), "and is gone");
+
+    directory.deleteRecursively();
+}
+
 } // namespace
 
 int main()
@@ -1150,6 +1276,7 @@ int main()
     testVelocityModulationAudio();
     testModulationStatePersistence();
     testKitDynamics();
+    testKitLibrary();
 
     std::cout << "\n============================\n"
               << passed << " passed, " << failed << " failed\n";

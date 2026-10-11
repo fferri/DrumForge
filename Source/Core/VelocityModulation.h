@@ -52,6 +52,16 @@ inline const char* modTargetName (int target) noexcept
     return "?";
 }
 
+/** Inverse of modTargetName, for reading kits back off disk. -1 when unrecognised. */
+inline int modTargetFromName (const juce::String& name) noexcept
+{
+    for (int i = 0; i < kNumModTargets; ++i)
+        if (name == modTargetName (i))
+            return i;
+
+    return -1;
+}
+
 /** The velocity that plays every knob exactly as dialled.
 
     A hit at 100 - which is what most MIDI keyboards and drum pads emit by default - maps

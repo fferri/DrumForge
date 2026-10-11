@@ -144,6 +144,28 @@ A kit also sets each track's **level depth**, because velocity dynamics are part
 voicing — a machine-style kit and an acoustic one respond very differently. The depths on
 the tone and envelope knobs are the player's expression, so loading a kit leaves those alone.
 
+### Saving your own kits
+
+Kits are individual files rather than plugin state, so they survive updates, can be backed
+up, and can be handed to someone else:
+
+```
+~/Library/Application Support/DrumForge/Kits/*.dfkit
+```
+
+`.dfkit` is plain XML — one `<TRACK>` per track, plus a `<MOD>` child for each non-zero
+velocity depth — so the format is diffable and hand-editable. Depths of zero are not
+written, which keeps the files readable.
+
+A saved kit is a **complete** snapshot: it restores every parameter *and* every modulation
+depth, so it sounds the same when it comes back. Factory kits are deliberately incomplete in
+that one respect — they set the engines, the values and the level depth, but leave the
+depths on the tone and envelope knobs alone. That difference is explicit in the code rather
+than accidental: `applyKit` takes a `DepthPolicy` and the two callers pass different values.
+
+*The data layer, file format and library are in place; the in-editor browser that drives
+them is the next piece of work.*
+
 ---
 
 ## Track layout and MIDI
@@ -187,6 +209,7 @@ Source/
     Models/               one file per engine, plus the factory and metadata table
     VelocityModulation.h  the velocity curve and how it moves a parameter
     ModulationState.*     per-parameter depths: saved with the session, not automatable
+    KitLibrary.*          kits as data: capture, apply, XML, and the factory + user library
     DrumTrack.h           one track: engine hosting, per-track FX, metering
     Parameters.h/.cpp     APVTS layout, GM note map, factory kits
     DrumKitProcessor.*    the AudioProcessor: 8 tracks, MIDI, reverb bus, master
@@ -200,7 +223,7 @@ Source/
   PluginEntry.cpp         createPluginFilter()
 Tools/
   RenderDemo.cpp          offline WAV renderer
-  RenderTests.cpp         offline verification suite (191 checks)
+  RenderTests.cpp         offline verification suite (227 checks)
   RenderScreenshot.cpp    editor smoke test / screenshot generator
   HostLoadTest.cpp        loads the built .vst3 through a real VST3 host (22 checks)
 ```
@@ -283,7 +306,7 @@ under the *Drum* category.
 
 ```sh
 cmake --build build
-./build/DrumForgeTests_artefacts/Release/DrumForgeTests              # 191 checks
+./build/DrumForgeTests_artefacts/Release/DrumForgeTests              # 227 checks
 ./build/DrumForgeHostTest_artefacts/Release/DrumForgeHostTest.app/Contents/MacOS/DrumForgeHostTest   # 22 checks
 ./build/DrumForgeScreenshot_artefacts/Release/DrumForgeScreenshot.app/Contents/MacOS/DrumForgeScreenshot docs/screenshot.png
 ./build/DrumForgeRender_artefacts/Release/DrumForgeRender renders    # writes WAVs you can listen to
@@ -299,6 +322,10 @@ plays inside full scale and still has a usable dynamic range; that the velocity 
 at 100, is symmetric and is monotonic; that depth 0 is an exact bypass at any velocity and a
 nominal hit is bit-identical whatever the depth; that modulation clamps rather than wraps;
 and that depths survive a session save while a session without them clears any leftovers;
+that a kit captures and restores every parameter and every depth while a factory kit leaves
+your tone depths alone; that kits survive XML and a round-trip through the filesystem, that
+re-saving replaces rather than duplicates, and that a name full of filename-hostile
+characters still works;
 that the band the editor draws spans exactly the range the audio path applies, including on
 a skewed range; that the GM note map, the hi-hat choke group, mute, solo
 and the post-fader reverb send all behave; that state round-trips exactly; and that the
