@@ -165,7 +165,7 @@ Kits are individual files rather than plugin state, so they survive updates, can
 up, and can be handed to someone else:
 
 ```
-~/Library/Application Support/DrumForge/Kits/*.dfkit
+~/Library/DrumForge/Kits/*.dfkit
 ```
 
 `.dfkit` is plain XML — one `<TRACK>` per track, plus a `<MOD>` child for each non-zero
@@ -243,10 +243,10 @@ and pick **MIDI note map → BeatStep Pro**:
 Each map ignores the other's notes, so note 36 does nothing while the BeatStep map is
 selected. The note number shown in each track's header follows the choice.
 
-The setting is stored **globally**, in `~/Library/Application Support/DrumForge/settings.xml`,
-rather than in the session: it describes the hardware in front of you, not the song, so a
-new project does not start on the wrong map. Tell me if you would rather it travelled with
-the project instead.
+The map is a real parameter, so it is **saved with the session** and visible to the host —
+a project that used a BeatStep reopens on the BeatStep map. Its *default* comes from the
+global preference in `~/Library/DrumForge/settings.xml`, written whenever you change it, so
+a one-time choice still applies to every new instance without re-picking it in each project.
 
 Note that the Industrial kit puts a sub drone on the tom notes and an atonal clang on the
 crash notes — deliberate, but easy to change: every track loads any engine.
@@ -309,7 +309,8 @@ Design points worth knowing:
   the kit is played.
 - **Randomising is constrained, not uniform.** The sweet-spot table in `Randomizer.cpp` is
   the ranges the twenty factory kits actually live in. It is the difference between a
-  randomiser you leave installed and one you use twice.
+  randomiser you leave installed and one you use twice. It also leaves the engine alone,
+  so the button varies the machine you chose rather than replacing it.
 - **Velocity enters the system in exactly one place.** The engines no longer read it at all;
   it reaches them only as already-modulated parameter values, which is what makes the
   behaviour adjustable instead of hard-coded.
@@ -337,22 +338,19 @@ Each track strip, top to bottom:
 Every one of those nine knobs accepts a velocity depth. The globals in the top bar
 (`Master` and the reverb) do not, because there is no per-hit meaning to attach to them.
 
-**`RND`** rolls a new machine for that track. It is deliberately constrained rather than
+**`RND`** rolls new settings for that machine. It is deliberately constrained rather than
 uniform, because a uniform draw over nine parameters mostly produces mud: each engine
 carries a sweet-spot range per macro (a kick with no sweep is a click, rumble below about
 0.4 is not rumble), tuning moves by musical intervals rather than freely so it cannot beat
 against the rest of the kit, and pan and send stay modest.
 
-**Level, mute and solo are never touched.** They are mix decisions, and randomising them
-would wreck the balance of the kit you are working in — the one change you cannot hear your
-way back from. The engine *is* rerolled, but kept in role: track 1 only ever gets a
-kick-family engine, and the last two only hats and cymbals, so the GM note map still makes
-sense afterwards.
+**The engine is never rerolled.** Choosing an engine is the decision you make when you pick
+a track, and a button that silently replaced it would throw that away — the useful gesture
+is "vary the machine I have", not "replace it with a stranger".
 
-The button is per machine on purpose. Rolling all eight at once is possible via the
-`DrumForgeKitLab random` tool, but it drifts a kit noticeably brighter — bright engines
-outnumber dark ones in the open middle slots — so one machine at a time is the better
-instrument.
+**Level, mute and solo are never touched either.** They are mix decisions, and randomising
+them would wreck the balance of the kit you are working in — the one change you cannot hear
+your way back from.
 
 The top bar holds the **Kit** selector, the global `Master` level and the shared reverb
 (`Size`, `Damp`, `Mix`, `Width`). `Send` on each track feeds that reverb bus post-fader.
@@ -404,15 +402,15 @@ nominal hit is bit-identical whatever the depth; that modulation clamps rather t
 and that depths survive a session save while a session without them clears any leftovers;
 that a kit captures and restores every parameter and every depth while a factory kit leaves
 your tone depths alone; that the randomiser leaves level, mute and solo untouched across
-fifty rolls, keeps every engine in role over three hundred, never rolls an engine a value
-that stops it being itself, and produces finite audible output from thirty consecutive
+fifty rolls, never rerolls the engine across sixty rolls on each of the nine, never rolls an
+engine a value that stops it being itself, and produces finite audible output from thirty consecutive
 rolls; that kits survive XML and a round-trip through the filesystem, that
 re-saving replaces rather than duplicates, and that a name full of filename-hostile
 characters still works;
 that the band the editor draws spans exactly the range the audio path applies, including on
 a skewed range; that both note maps resolve every pad back to its own track and ignore each other's notes,
-and that a new instance starts on the map last chosen while a corrupt settings file falls
-back to General MIDI; that the GM note map, the hi-hat choke group, mute, solo
+and that a new instance starts on the map last chosen, that the map travels with the
+session, and that a corrupt settings file falls back to General MIDI; that the GM note map, the hi-hat choke group, mute, solo
 and the post-fader reverb send all behave; that state round-trips exactly; and that the
 plugin survives the full host lifecycle — repeated `prepareToPlay`, `releaseResources` in
 between, sample-rate and buffer-size changes, and blocks larger or smaller than the

@@ -1291,66 +1291,65 @@ void testRandomiser()
     check (readParameter (processor, pid::track (3, pid::mute)) > 0.5f, "mute survives");
     check (readParameter (processor, pid::track (3, pid::solo)) < 0.5f, "solo survives");
 
-    // ---- the engine stays in role -----------------------------------------
-    bool kickRoleHeld = true, hatRoleHeld = true;
-    std::set<int> middleEngines;
-
-    for (int i = 0; i < 300; ++i)
-    {
-        randomiseTrack (processor, 0, rng);
-        const int k = (int) std::lround (readParameter (processor, pid::track (0, pid::model)));
-        kickRoleHeld = kickRoleHeld && (k == (int) ModelId::kick || k == (int) ModelId::membrane);
-
-        randomiseTrack (processor, 6, rng);
-        const int h = (int) std::lround (readParameter (processor, pid::track (6, pid::model)));
-        hatRoleHeld = hatRoleHeld && (h == (int) ModelId::metal || h == (int) ModelId::cymbal
-                                        || h == (int) ModelId::clang);
-
-        randomiseTrack (processor, 3, rng);
-        middleEngines.insert ((int) std::lround (readParameter (processor, pid::track (3, pid::model))));
-    }
-
-    check (kickRoleHeld, "track 1 only ever rolls a kick-family engine");
-    check (hatRoleHeld, "tracks 7-8 only ever roll hats and cymbals");
-    check ((int) middleEngines.size() >= 6, "the middle tracks reach most of the engine set",
-           juce::String ((int) middleEngines.size()) + " distinct engines in 300 rolls");
-
-    // ---- engine-specific sweet spots --------------------------------------
-    // The point of the constraints is that an engine never rolls a value that stops it
-    // being itself. Rumble below ~0.4 is not rumble, and metal with its metallic macro
-    // low is just noise.
+    // ---- the engine is never rerolled --------------------------------------
+    // Varying the machine you have is the useful gesture; replacing it with a stranger
+    // would discard the choice you made when you picked the track.
+    bool enginePreserved = true;
     bool rumbleKeepsLength = true, metalKeepsMetallic = true, kickKeepsClick = true;
     bool allInRange = true;
 
-    for (int i = 0; i < 500; ++i)
+    for (int model = 0; model < kNumModels; ++model)
     {
-        randomiseTrack (processor, 3, rng);
+        setParameter (processor, pid::track (3, pid::model), (float) model);
 
-        const int model = (int) std::lround (readParameter (processor, pid::track (3, pid::model)));
-        const float decay     = readParameter (processor, pid::track (3, pid::decay));
-        const float tone      = readParameter (processor, pid::track (3, pid::tone));
-        const float character = readParameter (processor, pid::track (3, pid::character));
-        const float sweep     = readParameter (processor, pid::track (3, pid::sweep));
-        const float drive     = readParameter (processor, pid::track (3, pid::drive));
-        const float send      = readParameter (processor, pid::track (3, pid::send));
-        const float pan       = readParameter (processor, pid::track (3, pid::pan));
+        for (int i = 0; i < 60; ++i)
+        {
+            randomiseTrack (processor, 3, rng);
 
-        if (model == (int) ModelId::rumble && decay < 0.35f)     rumbleKeepsLength = false;
-        if (model == (int) ModelId::metal && character < 0.45f)  metalKeepsMetallic = false;
-        if (model == (int) ModelId::kick && sweep < 0.15f)       kickKeepsClick = false;
+            const int after = (int) std::lround (readParameter (processor, pid::track (3, pid::model)));
+            enginePreserved = enginePreserved && after == model;
 
-        for (float v : { decay, tone, character, sweep, drive, send })
-            allInRange = allInRange && v >= 0.0f && v <= 1.0f;
+            const float decay     = readParameter (processor, pid::track (3, pid::decay));
+            const float tone      = readParameter (processor, pid::track (3, pid::tone));
+            const float character = readParameter (processor, pid::track (3, pid::character));
+            const float sweep     = readParameter (processor, pid::track (3, pid::sweep));
+            const float drive     = readParameter (processor, pid::track (3, pid::drive));
+            const float send      = readParameter (processor, pid::track (3, pid::send));
+            const float pan       = readParameter (processor, pid::track (3, pid::pan));
 
-        allInRange = allInRange && pan >= -1.0f && pan <= 1.0f;
+            // The constraints exist so an engine never rolls a value that stops it being
+            // itself. Rumble below ~0.4 is not rumble; metal with its metallic macro low
+            // is just noise.
+            if (model == (int) ModelId::rumble && decay < 0.35f)    rumbleKeepsLength = false;
+            if (model == (int) ModelId::metal && character < 0.45f) metalKeepsMetallic = false;
+            if (model == (int) ModelId::kick && sweep < 0.15f)      kickKeepsClick = false;
+
+            for (float v : { decay, tone, character, sweep, drive, send })
+                allInRange = allInRange && v >= 0.0f && v <= 1.0f;
+
+            allInRange = allInRange && pan >= -1.0f && pan <= 1.0f;
+        }
     }
 
+    check (enginePreserved, "the engine survives 60 rolls on each of the nine",
+           juce::String (kNumModels) + " engines x 60 rolls");
     check (rumbleKeepsLength, "rumble never rolls a decay short enough to stop being rumble");
     check (metalKeepsMetallic, "metal never rolls its metallic macro down into noise");
     check (kickKeepsClick, "kick always keeps some sweep, so it still has a click");
     check (allInRange, "every rolled value stays inside its parameter's range");
 
+    // ---- the macros really do move ----------------------------------------
+    std::set<float> seenDecays;
+    for (int i = 0; i < 40; ++i)
+    {
+        randomiseTrack (processor, 3, rng);
+        seenDecays.insert (readParameter (processor, pid::track (3, pid::decay)));
+    }
+    check ((int) seenDecays.size() >= 30, "and the parameters actually vary, not just jitter",
+           juce::String ((int) seenDecays.size()) + " distinct decays in 40 rolls");
+
     // Pan is deliberately restrained; a hard-panned machine is disorienting.
+
     bool panRestrained = true;
     for (int i = 0; i < 200; ++i)
     {
@@ -1498,6 +1497,21 @@ void testNoteMapOptions()
     reopened.prepareToPlay (sampleRate, blockSize);
     check (reopened.getNoteMap() == NoteMap::beatStepPro,
            "a new instance starts on the map last chosen");
+
+    // ---- the map travels with the session ----------------------------------
+    // It is a parameter now, so a project that used a BeatStep reopens on the BeatStep
+    // map rather than on whatever this machine happens to prefer.
+    processor.setNoteMap (NoteMap::beatStepPro);
+
+    juce::MemoryBlock session;
+    processor.getStateInformation (session);
+
+    DrumKitProcessor restored;
+    restored.prepareToPlay (sampleRate, blockSize);
+    restored.setStateInformation (session.getData(), (int) session.getSize());
+
+    check (restored.getNoteMap() == NoteMap::beatStepPro,
+           "the map is saved with the session");
 
     // ---- persistence is self-contained -------------------------------------
     check (juce::String (noteMapName (NoteMap::generalMidi)) == "General MIDI"

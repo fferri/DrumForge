@@ -190,10 +190,9 @@ TrackStrip::TrackStrip (DrumKitProcessor& owner, int index, EditorUiState& state
     // ---- Randomise ----------------------------------------------------------
     randomRng.seed (0x5f3759dfu ^ ((uint32_t) trackIndex * 0x9e3779b9u));
 
-    randomiseButton.setTooltip ("Roll a new machine for this track.\n"
-                                "Level, mute and solo are left alone so the kit's balance\n"
-                                "survives; the engine is kept in role, so track 1 stays kick\n"
-                                "and the last two stay hats and cymbals.");
+    randomiseButton.setTooltip ("Roll new settings for this machine.\n"
+                                "The engine, level, mute and solo are left alone: this varies\n"
+                                "the machine you have rather than replacing it.");
     randomiseButton.onClick = [this]
     {
         randomiseTrack (processor, trackIndex, randomRng);

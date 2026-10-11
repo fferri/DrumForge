@@ -36,6 +36,7 @@ namespace pid
     constexpr const char* solo      = "solo";
 
     constexpr const char* kit          = "kit";
+    constexpr const char* noteMap      = "noteMap";
     constexpr const char* master       = "master";
     constexpr const char* reverbSize   = "reverbSize";
     constexpr const char* reverbDamp   = "reverbDamp";
@@ -64,6 +65,7 @@ struct TrackParamRefs
 struct GlobalParamRefs
 {
     std::atomic<float>* kit         = nullptr;
+    std::atomic<float>* noteMap     = nullptr;
     std::atomic<float>* master      = nullptr;
     std::atomic<float>* reverbSize  = nullptr;
     std::atomic<float>* reverbDamp  = nullptr;

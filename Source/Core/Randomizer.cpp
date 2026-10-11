@@ -56,31 +56,18 @@ int randomInterval (Rng& rng)
 
 } // namespace
 
-juce::Array<int> allowedModelsForTrack (int trackIndex)
-{
-    if (trackIndex == 0)
-        return { (int) ModelId::kick, (int) ModelId::membrane };
-
-    if (trackIndex >= kNumTracks - 2)
-        return { (int) ModelId::metal, (int) ModelId::cymbal, (int) ModelId::clang };
-
-    return { (int) ModelId::snare, (int) ModelId::clap, (int) ModelId::membrane,
-             (int) ModelId::metal, (int) ModelId::fmPerc, (int) ModelId::clang,
-             (int) ModelId::rumble, (int) ModelId::kick };
-}
-
 void randomiseTrack (DrumKitProcessor& processor, int trackIndex, Rng& rng)
 {
     if (! juce::isPositiveAndBelow (trackIndex, kNumTracks))
         return;
 
-    const auto candidates = allowedModelsForTrack (trackIndex);
-    const int model = candidates[(int) (rng.nextU32() % (uint32_t) candidates.size())];
+    // Whatever engine the track already has. Never written back, so the host sees no
+    // spurious parameter change for it either.
+    const int model = juce::jlimit (0, kNumModels - 1, processor.getSelectedModel (trackIndex));
     const auto& spot = sweetSpots[model];
 
     const auto id = [trackIndex] (const char* name) { return pid::track (trackIndex, name); };
 
-    setParameterValue (processor.apvts, id (pid::model),     (float) model);
     setParameterValue (processor.apvts, id (pid::dist),
                        (float) (rng.nextU32() % (uint32_t) (int) DistortionMode::count));
     setParameterValue (processor.apvts, id (pid::pan),       between (rng, -0.5f, 0.5f));

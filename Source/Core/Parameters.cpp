@@ -1,5 +1,7 @@
 #include "Parameters.h"
 
+#include "Settings.h"
+
 namespace df
 {
 
@@ -277,6 +279,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         juce::ParameterID { pid::kit, versionHint }, "Kit", kitNames(), defaultKitIndex));
 
+    // The default comes from the global preference so a hardware choice made once applies
+    // to every new instance; the parameter itself is what the session then remembers.
+    juce::StringArray noteMapNames;
+
+    for (int i = 0; i < kNumNoteMaps; ++i)
+        noteMapNames.add (noteMapName ((NoteMap) i));
+
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        juce::ParameterID { pid::noteMap, versionHint }, "Note Map", noteMapNames,
+        (int) loadNoteMapSetting()));
+
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         juce::ParameterID { pid::master, versionHint }, "Master",
         juce::NormalisableRange<float> { -24.0f, 12.0f, 0.1f }, -5.0f,
@@ -366,6 +379,7 @@ void cacheParameterPointers (juce::AudioProcessorValueTreeState& state,
     }
 
     globalRefs.kit         = state.getRawParameterValue (pid::kit);
+    globalRefs.noteMap     = state.getRawParameterValue (pid::noteMap);
     globalRefs.master      = state.getRawParameterValue (pid::master);
     globalRefs.reverbSize  = state.getRawParameterValue (pid::reverbSize);
     globalRefs.reverbDamp  = state.getRawParameterValue (pid::reverbDamp);

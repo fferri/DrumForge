@@ -143,6 +143,22 @@ private:
         instance->setPlayConfigDetails (0, 2, sampleRate, blockSize);
         instance->prepareToPlay (sampleRate, blockSize);
 
+        // The note map's default comes from the user's global preference, so this test
+        // would silently pass or fail depending on whose Mac it runs on. Pin it to General
+        // MIDI before checking that GM notes make a sound.
+        bool pinnedNoteMap = false;
+
+        for (auto* parameter : instance->getParameters())
+        {
+            if (parameter->getName (64) == "Note Map")
+            {
+                parameter->setValueNotifyingHost (0.0f);
+                pinnedNoteMap = true;
+            }
+        }
+
+        check (pinnedNoteMap, "exposes a Note Map parameter the host can set");
+
         juce::AudioBuffer<float> buffer (2, blockSize);
         juce::MidiBuffer midi;
 

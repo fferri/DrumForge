@@ -26,20 +26,24 @@ DrumKitProcessor::DrumKitProcessor()
         lastVelocity[(size_t) t].store (kNominalVelocity, std::memory_order_relaxed);
     }
 
-    // Preferences are global, so a new instance starts on whatever was chosen last.
-    noteMap.store ((int) loadNoteMapSetting(), std::memory_order_relaxed);
-
     reverb.setSampleRate (48000.0);
 }
 
 NoteMap DrumKitProcessor::getNoteMap() const noexcept
 {
-    return (NoteMap) noteMap.load (std::memory_order_relaxed);
+    if (globalRefs.noteMap == nullptr)
+        return NoteMap::generalMidi;
+
+    return (NoteMap) juce::jlimit (0, kNumNoteMaps - 1,
+                                   (int) std::lround (globalRefs.noteMap->load()));
 }
 
 void DrumKitProcessor::setNoteMap (NoteMap map)
 {
-    noteMap.store ((int) map, std::memory_order_relaxed);
+    setParameterValue (apvts, pid::noteMap, (float) map);
+
+    // Also remembered globally, so the next new instance starts here rather than making
+    // the choice again in every project.
     saveNoteMapSetting (map);
 }
 

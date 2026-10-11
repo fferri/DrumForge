@@ -8,15 +8,11 @@
 namespace df
 {
 
-/** Engines that make sense on a given track.
+/** Randomises one machine's sound, leaving its engine alone.
 
-    A randomiser that dropped a cymbal on the kick note would produce a kit that is not
-    playable, so the engine choice follows the layout the GM note map assumes: track 1 is
-    the kick, the last two are hats and cymbals, and the middle five are open.
-*/
-juce::Array<int> allowedModelsForTrack (int trackIndex);
-
-/** Randomises one machine's sound.
+    The engine is deliberately not rerolled. Choosing an engine is the decision you make
+    when you pick a track, and a button that silently replaced it would throw that away -
+    the useful gesture is "vary the machine I have", not "replace it with a stranger".
 
     Deliberately *not* uniform. A uniform draw over nine parameters produces mostly
     unusable results: engines sound good only in particular ranges, sweep at zero removes
@@ -24,7 +20,7 @@ juce::Array<int> allowedModelsForTrack (int trackIndex);
     in the kit. So each engine carries a sweet-spot range per macro, tuning moves by
     musical intervals, and pan and send stay modest.
 
-    Level, mute and solo are left alone. They are mix decisions, and a randomiser that
+    Level, mute and solo are left alone too. They are mix decisions, and a randomiser that
     moved them would wreck the balance of the kit you are working in - the one thing you
     cannot hear your way back from.
 */

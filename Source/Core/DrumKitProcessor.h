@@ -72,8 +72,12 @@ public:
     // Velocity modulation. Depths are deliberately not parameters, so they have their own
     // accessors rather than going through apvts.getParameter().
 
-    /** Which MIDI note map the pads respond to. Stored globally, not in the session: it
-        describes the hardware in front of you rather than the song. */
+    /** Which MIDI note map the pads respond to.
+
+        It is a real parameter, so it is saved with the session and visible to the host -
+        a project that used a BeatStep reopens on the BeatStep map. Its *default* comes
+        from the user's global preference instead, so a one-time choice still applies to
+        every new instance. */
     NoteMap getNoteMap() const noexcept;
     void setNoteMap (NoteMap map);
 
@@ -133,7 +137,6 @@ private:
     std::array<std::atomic<float>, kNumTracks> lastVelocity;
 
     ModulationState modulation;
-    std::atomic<int> noteMap { (int) NoteMap::generalMidi };
 
     Rng triggerRng { 0x51ed2701u };
 
