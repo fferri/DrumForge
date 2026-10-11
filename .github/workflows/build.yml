@@ -47,7 +47,23 @@ jobs:
         run: cmake --build build --parallel 3
 
       - name: Verify
-        run: ./build/DrumForgeTests_artefacts/Release/DrumForgeTests
+        shell: bash
+        run: |
+          set +e
+          ./build/DrumForgeTests_artefacts/Release/DrumForgeTests > verify.log 2>&1
+          status=$?
+          set -e
+          cat verify.log
+          if [ "$status" -ne 0 ]; then
+            # GitHub turns ::error:: lines into check-run annotations, and annotations are
+            # readable through the API without repository admin rights. Job logs are not.
+            # Without this a failure is only visible to whoever can open the web UI.
+            tail -n 40 verify.log | while IFS= read -r line; do
+              echo "::error::${line//%/%25}"
+            done
+            echo "::error::the test suite exited $status"
+            exit "$status"
+          fi
 
       - name: Package
         run: |
@@ -91,7 +107,23 @@ jobs:
         run: cmake --build build --config Release --parallel 3
 
       - name: Verify
-        run: build\DrumForgeTests_artefacts\Release\DrumForgeTests.exe
+        shell: bash
+        run: |
+          set +e
+          ./build/DrumForgeTests_artefacts/Release/DrumForgeTests.exe > verify.log 2>&1
+          status=$?
+          set -e
+          cat verify.log
+          if [ "$status" -ne 0 ]; then
+            # GitHub turns ::error:: lines into check-run annotations, and annotations are
+            # readable through the API without repository admin rights. Job logs are not.
+            # Without this a failure is only visible to whoever can open the web UI.
+            tail -n 40 verify.log | while IFS= read -r line; do
+              echo "::error::${line//%/%25}"
+            done
+            echo "::error::the test suite exited $status"
+            exit "$status"
+          fi
 
       - name: Package
         shell: pwsh
