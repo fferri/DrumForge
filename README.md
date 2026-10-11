@@ -456,7 +456,8 @@ All four exit non-zero on failure and are safe to run in CI.
 
 DrumForge is released under the **GNU Affero General Public License v3.0** (AGPLv3).
 
-The full licence text is at <https://www.gnu.org/licenses/agpl-3.0.html>.
+The full licence text is in [LICENSE](LICENSE), and at
+<https://www.gnu.org/licenses/agpl-3.0.html>.
 
 The plugin links [JUCE](https://juce.com), which is itself dual-licensed under the AGPLv3
 or a commercial licence. Distributing DrumForge under the AGPLv3 satisfies JUCE's terms;
