@@ -1216,6 +1216,13 @@ void testKitLibrary()
            "an empty library offers exactly the factory kits",
            juce::String (library.getNumKits()) + " kits");
     check (library.isFactoryKit (0), "the first entries are factory");
+
+    // Guards the generated table: if FactoryKits.inc ever fails to be included, or the
+    // emitter writes nothing, the designed kits would vanish silently.
+    check (numFactoryKits() >= 23, "the designed kits are compiled in",
+           juce::String (numFactoryKits()) + " factory kits");
+    check (library.indexOfName ("IN-01 Scrapyard") >= 0, "and reachable by name");
+    check (library.indexOfName ("AM-05 Tin Roof Rain") >= 0, "including the last one");
     check (library.deleteKit (0).failed(), "factory kits cannot be deleted");
 
     auto saved = captured;

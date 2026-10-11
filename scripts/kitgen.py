@@ -21,6 +21,16 @@ import sys
 import xml.sax.saxutils as xml_escape
 
 MODELS = ["kick", "snare", "membrane", "metal", "clap", "cymbal", "fmPerc", "clang", "rumble"]
+
+# The parameter's own range, from createParameterLayout. A kit that states a value outside
+# this would be silently clamped by the plugin, so the file would lie about what plays.
+LIMITS = {
+    "level": (-60.0, 12.0), "pan": (-1.0, 1.0), "tune": (-24.0, 24.0),
+    "decay": (0.0, 1.0), "tone": (0.0, 1.0), "character": (0.0, 1.0),
+    "sweep": (0.0, 1.0), "drive": (0.0, 1.0), "send": (0.0, 1.0),
+}
+
+CLAMPED = []
 DISTS = ["soft", "hard", "fold", "fuzz", "crush"]
 TARGETS = ["Decay", "Tone", "Character", "Sweep", "Tune", "Level", "Drive", "Pan", "Send"]
 
@@ -209,12 +219,12 @@ KITS = [
     dict(lane="EL", name="Marimba Room", idea="melodic tuned percussion, almost no drums", layout=[
         track("kick",     decay=0.26, tone=0.50, character=0.52, sweep=0.56, tune=3),
         track("membrane", decay=0.44, tone=0.56, character=0.48, sweep=0.36, tune=12),
-        track("membrane", decay=0.36, tone=0.62, character=0.52, sweep=0.32, tune=19),
-        track("fmPerc",   decay=0.40, tone=0.58, character=0.56, sweep=0.62, tune=15),
+        track("membrane", decay=0.36, tone=0.62, character=0.52, sweep=0.32, tune=12),
+        track("fmPerc",   decay=0.40, tone=0.58, character=0.56, sweep=0.62, tune=5),
         track("fmPerc",   decay=0.30, tone=0.62, character=0.52, sweep=0.58, tune=7),
-        track("clang",    decay=0.52, tone=0.56, character=0.64, sweep=0.48, tune=22),
+        track("clang",    decay=0.52, tone=0.56, character=0.64, sweep=0.48, tune=10),
         track("metal",    decay=0.14, tone=0.64, character=0.78, sweep=0.24, tune=10),
-        track("cymbal",   decay=0.48, tone=0.60, character=0.58, sweep=0.52, tune=17),
+        track("cymbal",   decay=0.48, tone=0.60, character=0.58, sweep=0.52, tune=5),
     ]),
 
     dict(lane="EL", name="Night Bus", idea="deep and unhurried, late-night low end", layout=[
@@ -243,7 +253,7 @@ KITS = [
         track("kick",     decay=0.28, tone=0.60, character=0.58, sweep=0.64, tune=0),
         track("fmPerc",   decay=0.32, tone=0.68, character=0.60, sweep=0.66, tune=7),
         track("fmPerc",   decay=0.44, tone=0.64, character=0.64, sweep=0.72, tune=12),
-        track("clang",    decay=0.50, tone=0.70, character=0.82, sweep=0.50, tune=15),
+        track("clang",    decay=0.50, tone=0.70, character=0.82, sweep=0.50, tune=10),
         track("metal",    decay=0.10, tone=0.76, character=0.90, sweep=0.24, tune=19),
         track("metal",    decay=0.30, tone=0.72, character=0.86, sweep=0.20, tune=10),
         track("clang",    decay=0.62, tone=0.66, character=0.80, sweep=0.46, tune=5),
@@ -278,7 +288,7 @@ KITS = [
         track("clang",    decay=0.86, tone=0.68, character=0.74, sweep=0.48, tune=12),
         track("clang",    decay=0.80, tone=0.72, character=0.78, sweep=0.44, tune=-7),
         track("cymbal",   decay=0.94, tone=0.70, character=0.70, sweep=0.64, tune=7),
-        track("metal",    decay=0.24, tone=0.78, character=0.84, sweep=0.28, tune=19),
+        track("metal",    decay=0.24, tone=0.78, character=0.84, sweep=0.28, tune=12),
         track("fmPerc",   decay=0.76, tone=0.66, character=0.56, sweep=0.62, tune=17),
         track("cymbal",   decay=0.96, tone=0.64, character=0.68, sweep=0.60, tune=5),
         track("metal",    decay=0.50, tone=0.74, character=0.80, sweep=0.22, tune=14),
@@ -299,7 +309,7 @@ KITS = [
         track("kick",     decay=0.88, tone=0.22, character=0.38, sweep=0.34, tune=-7, drive=0.0),
         track("clang",    decay=0.60, tone=0.44, character=0.72, sweep=0.42, tune=9),
         track("clang",    decay=0.72, tone=0.48, character=0.76, sweep=0.40, tune=-6),
-        track("metal",    decay=0.16, tone=0.50, character=0.86, sweep=0.24, tune=16),
+        track("metal",    decay=0.16, tone=0.50, character=0.86, sweep=0.24, tune=8),
         track("fmPerc",   decay=0.66, tone=0.42, character=0.58, sweep=0.58, tune=11),
         track("cymbal",   decay=0.88, tone=0.42, character=0.68, sweep=0.56, tune=2),
         track("cymbal",   decay=0.94, tone=0.46, character=0.72, sweep=0.62, tune=7),
@@ -348,18 +358,27 @@ def build_kit(spec):
         for target, amount in entry.get("depths", {}).items():
             depths[target] = amount
 
+        fields = dict(
+            level=level, pan=pan, tune=tune,
+            decay=entry.get("decay", c["decay"]),
+            tone=entry.get("tone", c["tone"]),
+            character=entry.get("character", c["character"]),
+            sweep=entry.get("sweep", c["sweep"]),
+            drive=entry.get("drive", c["drive"]),
+            send=entry.get("send", c["send"]),
+        )
+
+        for field, value in fields.items():
+            lo, hi = LIMITS[field]
+            if not lo <= value <= hi:
+                CLAMPED.append(f"{spec['name']} track {index + 1}: {field} {value:+.2f} -> "
+                               f"clamped to {min(max(value, lo), hi):+.2f}")
+                fields[field] = min(max(value, lo), hi)
+
         tracks.append(dict(
             model=MODELS.index(model),
             dist=DISTS.index(c.get("dist", "soft")),
-            level=round(level, 3),
-            pan=round(pan, 3),
-            tune=round(tune, 3),
-            decay=round(entry.get("decay", c["decay"]), 3),
-            tone=round(entry.get("tone", c["tone"]), 3),
-            character=round(entry.get("character", c["character"]), 3),
-            sweep=round(entry.get("sweep", c["sweep"]), 3),
-            drive=round(entry.get("drive", c["drive"]), 3),
-            send=round(entry.get("send", c["send"]), 3),
+            **{k: round(v, 3) for k, v in fields.items()},
             depths=depths,
         ))
 
@@ -409,6 +428,11 @@ def main():
             handle.write(to_xml(name, tracks))
 
         print(f"{name:26} {spec['idea']}")
+
+    if CLAMPED:
+        print(f"\n{len(CLAMPED)} value(s) were outside the parameter range and got clamped:")
+        for line in CLAMPED:
+            print("  " + line)
 
     print(f"\n{len(KITS)} kits written to {out}")
     return 0

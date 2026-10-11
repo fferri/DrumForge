@@ -8,7 +8,7 @@
   <TRACK index="2" model="6" dist="0" level="-10.0" pan="-0.1" tune="19.0" decay="0.44" tone="0.64" character="0.64" sweep="0.72" drive="0.24" send="0.22">
     <MOD target="Level" depth="0.14"/>
   </TRACK>
-  <TRACK index="3" model="7" dist="0" level="-10.0" pan="0.15" tune="27.0" decay="0.5" tone="0.7" character="0.82" sweep="0.5" drive="0.24" send="0.22">
+  <TRACK index="3" model="7" dist="0" level="-10.0" pan="0.15" tune="22.0" decay="0.5" tone="0.7" character="0.82" sweep="0.5" drive="0.24" send="0.22">
     <MOD target="Level" depth="0.14"/>
   </TRACK>
   <TRACK index="4" model="3" dist="0" level="-10.0" pan="-0.14" tune="19.0" decay="0.1" tone="0.76" character="0.9" sweep="0.24" drive="0.24" send="0.22">

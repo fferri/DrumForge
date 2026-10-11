@@ -95,7 +95,9 @@ namespace
                 { mCymbal,   dSoft, -11.0f, -0.16f, 0.0f, 0.60f, 0.60f, 0.55f, 0.62f, 0.05f, 0.30f, 0.12f },
                 { mCymbal,   dSoft, -13.0f,  0.22f, 0.0f, 0.66f, 0.68f, 0.28f, 0.30f, 0.05f, 0.22f, 0.12f }
             }
-        }
+        },
+
+#include "FactoryKits.inc"
     };
 
     constexpr int defaultKitIndex = 0;   // Industrial

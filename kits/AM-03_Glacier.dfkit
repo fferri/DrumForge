@@ -11,7 +11,7 @@
   <TRACK index="3" model="5" dist="0" level="-8.0" pan="0.3" tune="19.0" decay="0.94" tone="0.7" character="0.7" sweep="0.64" drive="0.02" send="0.48">
     <MOD target="Level" depth="0.12"/>
   </TRACK>
-  <TRACK index="4" model="3" dist="0" level="-8.0" pan="0.35" tune="26.0" decay="0.24" tone="0.78" character="0.84" sweep="0.28" drive="0.02" send="0.48">
+  <TRACK index="4" model="3" dist="0" level="-8.0" pan="0.35" tune="19.0" decay="0.24" tone="0.78" character="0.84" sweep="0.28" drive="0.02" send="0.48">
     <MOD target="Level" depth="0.12"/>
   </TRACK>
   <TRACK index="5" model="6" dist="0" level="-8.0" pan="-0.28" tune="20.0" decay="0.76" tone="0.66" character="0.56" sweep="0.62" drive="0.02" send="0.48">

@@ -140,6 +140,21 @@ pans and sends — in one go. Every track stays editable afterwards.
 | **Warehouse** | Hard-clipped kick and snare, fuzzed tom, FM Perc on the ride slot. Tough but still musical |
 | **Studio** | The original clean kit, so nothing was lost in the twist |
 
+Twenty more ship alongside them, designed against reference recordings and five per lane:
+
+| Lane | Kits |
+|---|---|
+| Industrial | Scrapyard, Furnace, Rivet Gun, Collapse, Concrete |
+| IDM | Sinew, Halflife, Glass Teeth, Dowel, Static Bloom |
+| Electronica | Cassette, Marimba Room, Night Bus, Paper Cup, Sodium |
+| Ambient | Drift, Ember, Glacier, Sediment, Tin Roof Rain |
+
+They live in `kits/*.dfkit` as editable text and are compiled into the binary by
+`scripts/emit_factory_kits.py`, which writes `Source/Core/FactoryKits.inc`. Edit a `.dfkit`
+and re-run the script; nothing generated should be hand-edited. The emitter refuses to
+compile a kit whose modulation the factory table cannot carry, rather than shipping one
+that would not sound the same as the file it came from.
+
 A kit also sets each track's **level depth**, because velocity dynamics are part of a kit's
 voicing — a machine-style kit and an acoustic one respond very differently. The depths on
 the tone and envelope knobs are the player's expression, so loading a kit leaves those alone.
@@ -239,7 +254,7 @@ Source/
   PluginEntry.cpp         createPluginFilter()
 Tools/
   RenderDemo.cpp          offline WAV renderer
-  RenderTests.cpp         offline verification suite (245 checks)
+  RenderTests.cpp         offline verification suite (388 checks)
   RenderScreenshot.cpp    editor smoke test / screenshot generator
   HostLoadTest.cpp        loads the built .vst3 through a real VST3 host (22 checks)
 ```
@@ -342,7 +357,7 @@ under the *Drum* category.
 
 ```sh
 cmake --build build
-./build/DrumForgeTests_artefacts/Release/DrumForgeTests              # 245 checks
+./build/DrumForgeTests_artefacts/Release/DrumForgeTests              # 388 checks
 ./build/DrumForgeHostTest_artefacts/Release/DrumForgeHostTest.app/Contents/MacOS/DrumForgeHostTest   # 22 checks
 ./build/DrumForgeScreenshot_artefacts/Release/DrumForgeScreenshot.app/Contents/MacOS/DrumForgeScreenshot docs/screenshot.png
 ./build/DrumForgeRender_artefacts/Release/DrumForgeRender renders    # writes WAVs you can listen to
@@ -371,6 +386,11 @@ and the post-fader reverb send all behave; that state round-trips exactly; and t
 plugin survives the full host lifecycle — repeated `prepareToPlay`, `releaseResources` in
 between, sample-rate and buffer-size changes, and blocks larger or smaller than the
 prepared size.
+
+**`scripts/kitgen.py`** holds the twenty archetypes and regenerates `kits/*.dfkit`. It
+clamps every value to the parameter's real range and reports what it clamped, because a
+kit file stating a value the plugin would silently clamp is a file that lies about what
+plays.
 
 **`DrumForgeKitLab`** is the kit design harness, not shipped with the plugin. It writes
 the factory kits out as `.dfkit` and renders any `.dfkit` through a pattern matched to its
