@@ -397,10 +397,28 @@ and notes generated from the commits:
 Each build also runs the offline test suite, so a package is only produced if the engines,
 kits and state handling all pass on that platform.
 
-**The macOS package is not code-signed or notarised**, which requires an Apple Developer
-account. Most DAWs load it regardless, but Gatekeeper may warn on first use and stricter
-hosts may refuse it. Signing and notarisation can be added to the workflow with repository
-secrets if a Developer ID is available.
+### Installing the macOS package
+
+The macOS build is **ad-hoc signed, not notarised**. A browser download therefore arrives
+with the quarantine flag set, and Gatekeeper refuses to load it. The flag has to be cleared
+once, after copying the plugin into place:
+
+```sh
+xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/DrumForge.vst3
+```
+
+Then rescan plugins in your DAW. Downloading from a terminal (`curl`, `gh release
+download`) does not set the flag in the first place, so it needs no fix-up.
+
+Signing it yourself does not help. The build is already a valid signature — `codesign
+--verify` reports "valid on disk" — and `spctl -a` still answers `rejected`, because
+Gatekeeper wants a signature chaining to Apple's Developer ID rather than merely a valid
+one. A self-signed certificate is in the same position, and trusting it would mean asking
+users to install a root certificate. Notarisation is what removes the step above, and it
+needs a paid Apple Developer account.
+
+Windows has an equivalent problem: `SmartScreen` warns about downloaded executables until
+they build up reputation, which a self-signed certificate does not provide either.
 
 ## Verifying
 
