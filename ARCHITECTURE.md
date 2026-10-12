@@ -66,12 +66,28 @@ those macros in its own way.
 | **Clang** | Inharmonic FM, ring-modulated against a third oscillator |
 | **Rumble** | Two detuned subs plus a low-passed noise bed, up to twelve seconds |
 
-Two of them exist for a specific reason:
+Several borrow a specific technique worth naming:
 
-- **Clang** is the inharmonic engine. Its modulator and ring ratios move between √2, π, e
-  and the golden ratio — never whole numbers — so its partials cannot align with the
-  fundamental at any tuning. The `Clang` macro moves those ratios further from consonance
-  and raises the FM index, taking it from a struck bell towards torn metal.
+- **Metal** uses the TR-808 hi-hat topology: six band-limited squares at deliberately
+  inharmonic ratios — `2.0, 3.0, 4.16, 5.43, 6.79, 8.21` — heavily high-passed so that only
+  their upper harmonics survive.
+- **Cymbal** is four ring-modulated oscillator pairs. That is a cheap and very effective way
+  to build the dense inharmonic spectrum of a crash or ride without the numerical fragility
+  of extremely high-Q resonators.
+- **Membrane** sweeps between harmonic partials and the roots of the Bessel function J₀ —
+  `1, 1.5934, 2.1355, 2.2958, 2.6531, 2.9173`, the ideal circular membrane's mode ratios.
+  That sweep is what moves it from a tom towards a woodblock.
+- **Clap** is a single envelope re-opened by several rapid bursts; the last burst is the one
+  that decays into the tail.
+
+Two engines exist for a specific reason:
+
+- **Clang** is the inharmonic engine. Its modulator and ring ratios move between √2, π, e,
+  √5 and the golden ratio — never whole numbers — so its partials cannot align with the
+  fundamental at any tuning. It is atonal by construction rather than by detuning. The
+  `Clang` macro moves those ratios further from consonance *and* raises the FM index, taking
+  it from a struck bell towards torn metal. The ring modulation is what turns the FM
+  sidebands into a struck-metal spectrum: every partial spawns a sum and a difference pair.
 - **Rumble** supplies low end. Two sub oscillators a fraction of a percent apart beat slowly
   against each other, which is what gives long kick tails their movement. Decay reaches
   twelve seconds, so it doubles as a sustained bed. Through `Fold` drive it reads as part of
@@ -101,6 +117,26 @@ pan + level  ->  stereo mix bus,  plus a post-fader send to the reverb
 master gain  ->  soft clipper  ->  output
 ```
 
+### Shared DSP building blocks
+
+Decisions in `DspUtils.h` and `Envelopes.h` that everything else depends on:
+
+- **Decay is a −60 dB time.** `kDecayToTau = ln(1000)` converts "time to fall 60 dB" into an
+  exponential time constant, so the Decay knob means the same thing on every engine rather
+  than each one inventing its own coefficient.
+- **Knob ranges are exponential where the ear expects it** (`expMap`), giving a constant
+  ratio per unit of travel instead of a constant increment.
+- **Denormals are flushed** (`flushDenormal`), which guards against denormal stalls creeping
+  into feedback paths.
+- **`fastTanh` is a Padé 3/2 approximation**, continuous at the ±3 clamp and never exceeding
+  1 — so no distortion curve can overshoot.
+- **Envelopes snap to zero below −100 dB** and report inactive, so idle voices cost nothing.
+- **Oscillators are PolyBLEP band-limited**, which removes the aliasing a naive square would
+  fold back.
+- **The filter is a TPT state-variable filter** (Cytomic/Zavalishin form): stable under
+  modulation and well behaved at high cutoff. `q = 0.5` is critically damped.
+- **A DC blocker** removes the offset that asymmetric waveshaping introduces.
+
 ### Retrigger de-clicking
 
 Hitting a track while it is still ringing would otherwise cut the waveform and click. The
@@ -125,6 +161,15 @@ matters for the kit design process below: drive is a character control, not a co
 
 A `tanh` soft clipper guarantees the output never exceeds full scale however densely the kit
 is played, and the default master level is −5 dB.
+
+The reverb is JUCE's Freeverb on a shared bus fed post-fader by each track's `Send`. Its tail
+comes back well below the level of what fed it, so the return carries makeup gain
+(`reverbReturnGain = 2.0f`) — without it the reverb was inaudible at sensible settings.
+
+Note that the send is applied **post-fader but not fader-squared**: the track's output
+already carries the level, so scaling the send by the fader again would double-apply it. That
+was a real bug, caught by checking that a 20 dB fader cut produced a 20 dB send cut rather
+than 40.
 
 **There is deliberately no compressor or limiter on the master.** Reference recordings are
 mastered, so their crest factor is not achievable by an instrument that does not master
@@ -297,6 +342,26 @@ The editor allows 1120×660 up to 2400×1500. The knob cells are **width-limited
 height-limited**, which is why growing the track header to fit the `RND` button cost the
 knobs nothing.
 
+Smaller decisions, each of which was made for a reason:
+
+- **A rim drag covers 180 px for a full −1..+1 depth sweep.** Fast enough to be useful, slow
+  enough to place a value precisely.
+- **A depth drag is deliberately not forwarded to the `Slider`**, so the parameter value
+  cannot move at the same time.
+- **The dot uses JUCE's rotary-thumb angle convention**, so it sits on the arc exactly where
+  the pointer does, including on a skewed range.
+- **Depth handles are drawn on top of the value arc**, so the arc cannot bury the thing you
+  are meant to grab.
+- **The band is drawn wide but sheer** — wide enough to read as a range, translucent enough
+  that the crisp value arc on top still wins.
+- **The level meter floors at −60 dB** and normalises over `(dB + 48) / 54`, going hot above
+  0.86.
+- **The editor ticks at 30 Hz**, enough for meters and pad glow without repainting the window
+  more often than it changes.
+- **Tooltips carry the policy, not just the control.** The kit button explains why built-in
+  kits cannot be edited, and `RND` says what it will not touch, because those are the two
+  places a user is most likely to be surprised.
+
 ### Testing seams
 
 `DrumKitEditor` exposes `refreshFromProcessor()` and `getTrackNoteLabel()` purely so a test
@@ -363,6 +428,28 @@ Two things follow that are easy to get wrong:
 JUCE is **not vendored**. It is cloned as a subdirectory, which is why `JUCE/` is gitignored
 and why CI caches it — fetching it takes longer than the build.
 
+Everything except the entry point lives in a static library (`DrumForgeCore`) so the offline
+tools can reuse it. `PluginEntry.cpp` is deliberately its own translation unit, compiled
+straight into the plugin target, so the wrapper can always find `createPluginFilter`
+regardless of how the linker treats the static library.
+
+`DrumForgeHostTest` deliberately does **not** link `DrumForgeCore`: it exercises the shipped
+`.vst3` as a black box, through the same hosting code a DAW uses, so it must not be able to
+reach into the plugin's internals.
+
+### Two platform traps worth knowing
+
+- **A `gui_app` on Windows links `/SUBSYSTEM:WINDOWS`, which needs `WinMain`.** Only a
+  `JUCEApplication` built with `START_JUCE_APPLICATION` provides one. `DrumForgeScreenshot`
+  had a plain `main()`, so it failed to link there; it is a `console_app` now, which is also
+  the honest description of a command-line tool that renders offscreen. `HostLoadTest`, by
+  contrast, must be a `gui_app`: on macOS JUCE drives the message loop with `[NSApp run]`,
+  which only works from a real app bundle.
+- **Failure reporting in CI.** GitHub returns `403` for job logs unless you have repository
+  admin rights, which makes a CI-only failure invisible. The workflow emits `::error::` lines
+  instead, because GitHub turns those into check-run annotations and *annotations* are
+  readable without admin rights. That is also how the Windows-only test failure was found.
+
 ### Code signing on macOS
 
 CMake signs the bundle as part of *linking*, but JUCE writes
@@ -420,6 +507,70 @@ Four tools, all of which exit non-zero on failure and run in CI. What each one c
   round of kit measurements before it was noticed.
 - **Anything reading a user preference must not write to it during tests.** A test that
   silently changed the note map of whoever ran it would be a genuinely nasty bug to chase.
+
+---
+
+## Invariants
+
+Rules the code depends on being true. Each of these has already been broken once and caused a
+bug, which is why they are written down rather than left implicit.
+
+### Real-time safety
+
+1. **Everything on `DrumTrack` is audio-thread only**, except `readPeakAndReset` and
+   `getTriggerCount`. The UI communicates through those atomics and the APVTS, never by
+   touching engine state directly.
+2. **`setModel` must not allocate.** Retargeting a pointer is the entire reason every engine is
+   instantiated up front.
+3. **The audio thread never touches the APVTS ValueTree.** It is not thread-safe; depths and
+   the last-hit velocity are read from atomics instead.
+4. **Parameter writes go through `setParameterValue`**, which notifies the host, and are
+   message-thread only.
+5. **`readTrackPeak` is read-and-clear.** Call it once per observation — never twice in one
+   expression, because C++ leaves argument evaluation order unspecified and the second call
+   returns zero.
+
+### Signal path
+
+6. **The retrigger de-click stays before the DC blocker.** Moving it after makes the blocker
+   answer the step with a thump far larger than the click.
+7. **Mute and solo are applied after modulation**, so a muted track is silent whatever velocity
+   arrives.
+8. **The FX send is post-fader and is never scaled by the fader a second time.**
+
+### Lifecycle
+
+9. **`prepareToPlay` must null `activeEngine` before replacing the engine array.** Hosts call it
+   repeatedly, and a dangling pointer there crashed Ableton Live on the second call.
+10. **Rendering must chunk blocks larger than the prepared size.** Hosts do not always hand over
+    the block size they prepared with.
+
+### Modulation and kits
+
+11. **Nominal velocity and depth 0 must return the knob value bit-for-bit.** That is why
+    `applyVelocityModulation` returns early on a zero weight: the normalised round trip is not
+    lossless.
+12. **Depths must never become `AudioProcessorParameter`s**, or they appear in the host's
+    automation list.
+13. **A kit defines its modulation completely.** `applyKit` sets every depth, kits carry all
+    nine in ModTarget order, and only non-zero depths are serialised.
+14. **`FactoryKits.inc` is generated.** Edit `kits/*.dfkit` and re-run
+    `scripts/emit_factory_kits.py`; never hand-edit the include.
+15. **The note map is one of two, never a union**, and is both a session parameter and a global
+    default preference.
+
+### UI and build
+
+16. **Note captions refresh on the editor's timer, never in a constructor** — the map can change
+    while the editor is open.
+17. **The kit parameter is polled rather than attached**, so restoring a session does not
+    re-apply the preset over the restored values.
+18. **Anything constructing a processor must call `setSettingsDirectoryOverride` first**, before
+    construction: the note map's default is read in the constructor.
+19. **The macOS re-sign `POST_BUILD` must stay registered after `juce_add_plugin`**, and its
+    `codesign --verify` must not be dropped.
+20. **`sanitiseFileName` strips trailing dots and spaces**, which are legal on macOS but not on
+    Windows.
 
 ---
 

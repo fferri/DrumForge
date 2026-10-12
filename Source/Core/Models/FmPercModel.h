@@ -46,7 +46,8 @@ public:
         const int ratioIndex = std::clamp ((int) std::lround (p.character * (numRatios - 1)), 0, numRatios - 1);
         modulatorRatio = ratios[ratioIndex];
 
-        // Harder hits are brighter, as on a real struck bar.
+        // Sweep drives the modulation index. More index means more sidebands, so a struck
+        // tone gets brighter and more clangorous without its pitch moving.
         indexAmount = p.sweep * 12.0f;
 
         carrierPhase = 0.0f;

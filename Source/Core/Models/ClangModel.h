@@ -65,7 +65,8 @@ public:
         sweepOctaves = p.sweep * 1.2f;
         clang = p.character;
 
-        // Harder hits excite more of the inharmonic content.
+        // The Clang macro sets both how far the ratios sit from consonance and the FM
+        // index, so turning it up excites more of that inharmonic content.
         fmIndex = p.character * 7.0f;
 
         for (int v = 0; v < numVoices; ++v)
