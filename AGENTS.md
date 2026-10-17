@@ -87,7 +87,7 @@ A change is not finished until it has been verified on the machine it runs on.
 | Path | What lives there |
 |---|---|
 | `kits/` | The kit definitions, as editable `.dfkit` XML. **The source of truth for kit content** |
-| `docs/` | The screenshot used in the README |
+| `docs/` | The UI screenshot used in the README, `drumforge-ui.png` |
 | `.github/workflows/` | CI: builds both platforms, tests, packages, releases |
 | `README.md` | For users: installing, using, licensing, supporting |
 | `ARCHITECTURE.md` | For developers: how it works and why it is built this way |
@@ -178,7 +178,7 @@ cmake --build build
 ./build/DrumForgeHostTest_artefacts/Release/DrumForgeHostTest.app/Contents/MacOS/DrumForgeHostTest
 
 # Renders the editor to a PNG. The only way to check that the band and dot actually draw.
-./build/DrumForgeScreenshot_artefacts/Release/DrumForgeScreenshot docs/screenshot.png
+./build/DrumForgeScreenshot_artefacts/Release/DrumForgeScreenshot docs/drumforge-ui.png
 
 # Writes WAVs you can listen to, one per engine and one per factory kit.
 ./build/DrumForgeRender_artefacts/Release/DrumForgeRender renders

@@ -64,7 +64,7 @@ int main (int argc, char** argv)
 
     const juce::File outputFile = argc > 1
         ? juce::File::getCurrentWorkingDirectory().getChildFile (argv[1])
-        : juce::File::getCurrentWorkingDirectory().getChildFile ("docs/screenshot.png");
+        : juce::File::getCurrentWorkingDirectory().getChildFile ("docs/drumforge-ui.png");
 
     // Deterministic: never read the preferences of whoever runs this, so the committed
     // screenshot does not depend on which note map they happen to use. This has to come

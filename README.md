@@ -8,7 +8,7 @@ Tracks are triggered over MIDI using either the General MIDI drum map or an Artu
 BeatStep Pro's note numbers. Each track has its own distortion curve, drive, tune, pan,
 level and reverb send, and every continuous parameter can be varied by velocity.
 
-![DrumForge](docs/screenshot.png)
+![DrumForge](docs/drumforge-ui.png)
 
 *Knobs with a velocity depth dialled in show a coloured band for the range velocity can
 reach, and a dot for where the last hit actually landed.*
