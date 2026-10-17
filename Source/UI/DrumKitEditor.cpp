@@ -520,7 +520,14 @@ void DrumKitEditor::refreshFromProcessor()
     for (auto& strip : strips)
         strip->updateFromProcessor();
 
+    // Both lane pages repaint from here. The playheads are the reason: they read a position
+    // the audio thread writes every block, so a lane that is not repainted on the timer has
+    // a playhead that only moves when something else happens to redraw it - a mouse event,
+    // or a page change. That is exactly how the automation playhead shipped broken.
     for (auto& lane : lanes)
+        lane->refreshFromProcessor();
+
+    for (auto& lane : automationLanes)
         lane->refreshFromProcessor();
 }
 

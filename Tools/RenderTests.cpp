@@ -1916,6 +1916,21 @@ void testSequencerAudio()
 
         check (loud > quiet, "an automation lane moves the parameter the next hit uses",
                juce::String (quiet) + " -> " + juce::String (loud));
+
+        // The playhead the editor draws reads this, so it has to move on its own as the
+        // transport advances; it is the only thing proving the position is live rather than
+        // being recomputed only when something else redraws the lane.
+        const float phaseNow = processor.getAutomationPhase (0, 0);
+
+        playHead.ppq += 0.125;
+        peakOf();
+
+        const float phaseLater = processor.getAutomationPhase (0, 0);
+
+        check (std::abs (phaseLater - phaseNow) > 1.0e-3f,
+               "the automation phase advances with the transport, for the playhead",
+               juce::String (phaseNow) + " -> " + juce::String (phaseLater));
+        check (phaseLater >= 0.0f && phaseLater <= 1.0f, "and stays inside its cycle");
     }
 
     processor.setPlayHead (nullptr);
