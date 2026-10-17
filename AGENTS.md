@@ -171,7 +171,7 @@ The VST3 bundle lands at `build/DrumForge_artefacts/Release/VST3/DrumForge.vst3`
 ```sh
 cmake --build build
 
-# The main suite: 433 checks. Drives the processor headlessly.
+# The main suite: 469 checks. Drives the processor headlessly.
 ./build/DrumForgeTests_artefacts/Release/DrumForgeTests
 
 # End-to-end through the real VST3 hosting code: 23 checks.

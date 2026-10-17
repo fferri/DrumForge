@@ -19,41 +19,46 @@ enum class LaneType
 
 constexpr int kNumLaneTypes = 4;
 
-/** How long one step lasts, in beats (quarter notes).
+/** The speed multiplier for a lane.
 
-    The set spans the useful range and, crucially, includes thirds: 1/3 of a beat is a
-    triplet 16th, which is what makes a 3-against-4 polyrhythm possible between two lanes.
+    A step is a 1/16 note divided by the multiplier, so **larger is faster**:
 
-    | Speed        | Beats | At 120 BPM | Reads as        |
-    |---|---|---|---|
-    | 1/8 beat     | 0.125 |    62.5 ms | 32nd note       |
-    | 1/4 beat     | 0.25  |   125.0 ms | 16th note       |
-    | 1/3 beat     | 0.333 |   166.7 ms | triplet 16th    |
-    | 1/2 beat     | 0.5   |   250.0 ms | eighth note     |
-    | 1 beat       | 1.0   |   500.0 ms | quarter note    |
-    | 2 beats      | 2.0   |        1 s | half note       |
-    | 3 beats      | 3.0   |      1.5 s | dotted half     |
-    | 4 beats      | 4.0   |        2 s | one bar in 4/4  |
-    | 6 beats      | 6.0   |        3 s | 3/2 bars        |
-    | 8 beats      | 8.0   |        4 s | two bars in 4/4 |
+    | Multiplier | Step length | At 120 BPM |
+    |---|---|---|
+    | 1/8 | 1/2 note      | 1000 ms |
+    | 1/4 | 1/4 note      |  500 ms |
+    | 1/3 | 3/16 note     |  375 ms |
+    | 1/2 | 1/8 note      |  250 ms |
+    | 1   | 1/16 note     |  125 ms |
+    | 2   | 1/32 note     |   62.5 ms |
+    | 3   | 1/48 note     |   41.7 ms |
+    | 4   | 1/64 note     |   31.25 ms |
+    | 6   | 1/96 note     |   20.8 ms |
+    | 8   | 1/128 note    |   15.6 ms |
+
+    The list deliberately mixes simple ratios with 1/3 and 3, which is what lets one lane run
+    a triplet feel against another's straight one.
 */
 enum class LaneSpeed
 {
-    eighthBeat = 0,
-    quarterBeat,
-    thirdBeat,
-    halfBeat,
-    beat,
-    twoBeats,
-    threeBeats,
-    fourBeats,
-    sixBeats,
-    eightBeats
+    xEighth = 0,   ///< 1/8, a half-note step
+    xQuarter,      ///< 1/4, a quarter-note step
+    xThird,        ///< 1/3, a 3/16 step
+    xHalf,         ///< 1/2, an eighth-note step
+    xOne,          ///< 1, a 1/16 step
+    xTwo,          ///< 2, a 1/32 step
+    xThree,        ///< 3, a 1/48 step
+    xFour,         ///< 4, a 1/64 step
+    xSix,          ///< 6, a 1/96 step
+    xEight        ///< 8, a 1/128 step
 };
 
 constexpr int kNumLaneSpeeds = 10;
 
-/** Step duration in beats. */
+/** The multiplier itself: 1/8, 1/4, 1/3, ..., 8. */
+float laneSpeedMultiplier (LaneSpeed) noexcept;
+
+/** Step duration in beats, which is (1/16 note) / multiplier = 0.25 / multiplier. */
 float laneSpeedInBeats (LaneSpeed) noexcept;
 const char* laneSpeedName (LaneSpeed) noexcept;
 const char* laneTypeName (LaneType) noexcept;
@@ -73,7 +78,7 @@ struct ModPoint
 struct SequencerLane
 {
     LaneType type = LaneType::off;
-    LaneSpeed speed = LaneSpeed::halfBeat;
+    LaneSpeed speed = LaneSpeed::xOne;   // 1/16 notes by default
 
     /** Steps in one cycle. For a modulation lane this is how many steps the envelope spans,
         which is what gives a slow lane a long sweep. */

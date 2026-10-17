@@ -8,6 +8,7 @@
 #include "../Core/DrumKitProcessor.h"
 #include "../Core/KitLibrary.h"
 #include "ModelKnob.h"
+#include "SequencerLane.h"
 #include "Theme.h"
 #include "TrackStrip.h"
 #include "UiState.h"
@@ -77,10 +78,10 @@ private:
     EditorUiState uiState;
 
     std::array<std::unique_ptr<TrackStrip>, (size_t) kNumTracks> strips;
-    std::unique_ptr<ModelKnob> masterKnob;
+    std::array<std::unique_ptr<SequencerLaneComponent>, (size_t) kNumTracks> lanes;
     std::array<std::unique_ptr<ModelKnob>, 4> reverbKnobs;
 
-    juce::Rectangle<int> topBarArea, titleArea, kitLabelArea, menuButtonArea, globalsArea,
+    juce::Rectangle<int> topBarArea, titleArea, kitLabelArea, menuButtonArea,
                         tabBarArea, hintArea, trackArea, seqArea, fxArea;
 
     /** The kit the editor last loaded, or -1 once the current sound matches no kit. */

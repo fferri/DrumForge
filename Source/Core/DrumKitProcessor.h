@@ -6,6 +6,7 @@
 
 #include "DrumTrack.h"
 #include "ModulationState.h"
+#include "Sequencer.h"
 #include "Parameters.h"
 
 namespace df
@@ -84,6 +85,10 @@ public:
     void setNoteMap (NoteMap map);
 
     ModulationState& getModulationState() noexcept { return modulation; }
+
+    /** The sequencer lanes. Message thread; the audio thread reads the same object. */
+    SequencerState& getSequencerState() noexcept { return sequencer; }
+    const SequencerState& getSequencerState() const noexcept { return sequencer; }
     const ModulationState& getModulationState() const noexcept { return modulation; }
 
     /** Sets how far a velocity sweep moves one parameter. `depth` is -1..1. Message thread. */
@@ -139,6 +144,17 @@ private:
     std::array<std::atomic<float>, kNumTracks> lastVelocity;
 
     ModulationState modulation;
+
+    /** The eight lanes. Written on the message thread by the sequencer page and read on the
+        audio thread; every field is a plain scalar, so the worst a race can do is let one
+        block hear a half-applied edit, never crash or wedge a voice. */
+    SequencerState sequencer;
+
+    /** Audio-thread only: turns transport position into lane actions. */
+    SequencerTransport transport;
+
+    /** Audio-thread only: the offset each modulation lane contributes this block. */
+    std::array<std::array<float, (size_t) kNumModTargets>, (size_t) kNumTracks> sequenceOffsets {};
 
     Rng triggerRng { 0x51ed2701u };
 

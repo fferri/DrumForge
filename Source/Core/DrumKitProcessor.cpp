@@ -118,6 +118,47 @@ void DrumKitProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
         }
     }
 
+    // ---- Sequencer ------------------------------------------------------------
+    {
+        double ppq = 0.0;
+        double bpm = 120.0;
+        bool playing = false;
+
+        if (auto* playHead = getPlayHead())
+        {
+            if (const auto position = playHead->getPosition())
+            {
+                if (const auto ppqOpt = position->getPpqPosition())
+                    ppq = *ppqOpt;
+
+                if (const auto bpmOpt = position->getBpm())
+                    bpm = *bpmOpt;
+
+                playing = position->getIsPlaying();
+            }
+        }
+
+        const double beatsPerSample = bpm / (60.0 * juce::jmax (1.0, getSampleRate()));
+        const double blockBeats = (double) numSamples * beatsPerSample;
+
+        std::array<LaneAction, kNumSequencerLanes> laneActions {};
+        transport.advance (sequencer, ppq, ppq + blockBeats, playing, laneActions);
+
+        for (auto& trackOffsets : sequenceOffsets)
+            trackOffsets.fill (0.0f);
+
+        for (int t = 0; t < kNumTracks; ++t)
+        {
+            const auto& action = laneActions[(size_t) t];
+
+            if (action.trigger)
+                triggerTrackInternal (t, 1.0f);
+
+            if (action.modulates && juce::isPositiveAndBelow (action.target, kNumModTargets))
+                sequenceOffsets[(size_t) t][(size_t) action.target] = action.value;
+        }
+    }
+
     // ---- Render, honouring sample-accurate MIDI positions ---------------------
     const int hostChannels = buffer.getNumChannels();
 
@@ -299,7 +340,8 @@ int DrumKitProcessor::getActiveModel (int trackIndex) const noexcept
 ModelParams DrumKitProcessor::buildTrackParams (int trackIndex, float velocity) const
 {
     ModulatedValues modulated;
-    applyVelocityModulation (modRefs[(size_t) trackIndex], velocity, modulated);
+    applyVelocityModulation (modRefs[(size_t) trackIndex], velocity, modulated,
+                             sequenceOffsets[(size_t) trackIndex].data());
 
     const auto value = [&modulated] (ModTarget target)
     {

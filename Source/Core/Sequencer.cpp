@@ -8,42 +8,49 @@
 namespace df
 {
 
-float laneSpeedInBeats (LaneSpeed speed) noexcept
+float laneSpeedMultiplier (LaneSpeed speed) noexcept
 {
     switch (speed)
     {
-        case LaneSpeed::eighthBeat:  return 0.125f;
-        case LaneSpeed::quarterBeat: return 0.25f;
-        case LaneSpeed::thirdBeat:   return 1.0f / 3.0f;
-        case LaneSpeed::halfBeat:    return 0.5f;
-        case LaneSpeed::beat:        return 1.0f;
-        case LaneSpeed::twoBeats:    return 2.0f;
-        case LaneSpeed::threeBeats:  return 3.0f;
-        case LaneSpeed::fourBeats:   return 4.0f;
-        case LaneSpeed::sixBeats:    return 6.0f;
-        case LaneSpeed::eightBeats:  return 8.0f;
+        case LaneSpeed::xEighth:  return 0.125f;
+        case LaneSpeed::xQuarter: return 0.25f;
+        case LaneSpeed::xThird:   return 1.0f / 3.0f;
+        case LaneSpeed::xHalf:    return 0.5f;
+        case LaneSpeed::xOne:     return 1.0f;
+        case LaneSpeed::xTwo:     return 2.0f;
+        case LaneSpeed::xThree:   return 3.0f;
+        case LaneSpeed::xFour:    return 4.0f;
+        case LaneSpeed::xSix:     return 6.0f;
+        case LaneSpeed::xEight:   return 8.0f;
     }
 
-    return 0.5f;
+    return 1.0f;
+}
+
+float laneSpeedInBeats (LaneSpeed speed) noexcept
+{
+    // A step is a 1/16 note (a quarter of a beat) divided by the multiplier, so a larger
+    // multiplier gives a shorter step. 4 is a whole note in quarter notes, hence 0.25.
+    return 0.25f / laneSpeedMultiplier (speed);
 }
 
 const char* laneSpeedName (LaneSpeed speed) noexcept
 {
     switch (speed)
     {
-        case LaneSpeed::eighthBeat:  return "1/8 beat";
-        case LaneSpeed::quarterBeat: return "1/4 beat";
-        case LaneSpeed::thirdBeat:   return "1/3 beat";
-        case LaneSpeed::halfBeat:    return "1/2 beat";
-        case LaneSpeed::beat:        return "1 beat";
-        case LaneSpeed::twoBeats:    return "2 beats";
-        case LaneSpeed::threeBeats:  return "3 beats";
-        case LaneSpeed::fourBeats:   return "4 beats";
-        case LaneSpeed::sixBeats:    return "6 beats";
-        case LaneSpeed::eightBeats:  return "8 beats";
+        case LaneSpeed::xEighth:  return "x1/8";
+        case LaneSpeed::xQuarter: return "x1/4";
+        case LaneSpeed::xThird:   return "x1/3";
+        case LaneSpeed::xHalf:    return "x1/2";
+        case LaneSpeed::xOne:     return "x1";
+        case LaneSpeed::xTwo:     return "x2";
+        case LaneSpeed::xThree:   return "x3";
+        case LaneSpeed::xFour:    return "x4";
+        case LaneSpeed::xSix:     return "x6";
+        case LaneSpeed::xEight:   return "x8";
     }
 
-    return "1/2 beat";
+    return "x1";
 }
 
 const char* laneTypeName (LaneType type) noexcept

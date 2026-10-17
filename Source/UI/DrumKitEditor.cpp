@@ -62,14 +62,17 @@ DrumKitEditor::DrumKitEditor (DrumKitProcessor& owner)
         addAndMakeVisible (*strips[(size_t) t]);
     }
 
-    // ---- Global knobs --------------------------------------------------------
-    // No modulation target: there is no per-hit meaning to attach to the master or reverb.
-    masterKnob = std::make_unique<ModelKnob> (kit(), -1, -1, uiState, pid::master);
-    masterKnob->setDisplayName ("Master");
-    masterKnob->setAccentColour (theme::accent);
-    masterKnob->setTooltip ("Output level of the whole kit");
-    addAndMakeVisible (*masterKnob);
+    // ---- Sequencer lanes -----------------------------------------------------
+    for (int t = 0; t < kNumTracks; ++t)
+    {
+        lanes[(size_t) t] = std::make_unique<SequencerLaneComponent> (kit(), t);
+        addAndMakeVisible (*lanes[(size_t) t]);
+    }
 
+    // ---- Global knobs --------------------------------------------------------
+    // The reverb lives on its own page. The master level has no knob at all: it stays an
+    // automatable parameter, but the top bar is worth more than a control nobody needs to
+    // reach for on every session.
     const char* reverbIDs[4] { pid::reverbSize, pid::reverbDamp, pid::reverbMix, pid::reverbWidth };
     const char* reverbNames[4] { "Size", "Damp", "Mix", "Width" };
     const char* reverbTips[4]
@@ -129,6 +132,12 @@ void DrumKitEditor::setMode (EditorUiState::Mode mode)
     }
 
     updateContentVisibility();
+
+    // A lane's type decides which of its controls are visible, so a lane shown for the first
+    // time has to re-sync before it is laid out.
+    for (auto& lane : lanes)
+        lane->refreshFromProcessor();
+
     resized();
     repaint();
 }
@@ -145,7 +154,8 @@ void DrumKitEditor::updateContentVisibility()
     for (auto& knob : reverbKnobs)
         knob->setVisible (mode == EditorUiState::Mode::fx);
 
-    masterKnob->setVisible (true);
+    for (auto& lane : lanes)
+        lane->setVisible (mode == EditorUiState::Mode::seq);
 }
 
 //==============================================================================
@@ -163,10 +173,6 @@ void DrumKitEditor::resized()
         menuButtonArea = bar.removeFromRight (56).withSizeKeepingCentre (56, 26);
         menuButton.setBounds (menuButtonArea);
         bar.removeFromRight (12);
-
-        // Only the master lives up here now; the reverb moved to its own page.
-        globalsArea = bar.removeFromRight (juce::jmin (96, bar.getWidth() / 4));
-        masterKnob->setBounds (globalsArea);
 
         kitLabelArea = bar.reduced (6, 0);
         kitLabel.setBounds (kitLabelArea);
@@ -200,10 +206,17 @@ void DrumKitEditor::resized()
     const int rowHeight = trackArea.getHeight() / kNumTracks;
 
     for (int t = 0; t < kNumTracks; ++t)
+    {
         strips[(size_t) t]->setBounds (trackArea.getX(),
                                        trackArea.getY() + t * rowHeight,
                                        trackArea.getWidth(),
                                        rowHeight);
+
+        lanes[(size_t) t]->setBounds (seqArea.getX(),
+                                      seqArea.getY() + t * rowHeight,
+                                      seqArea.getWidth(),
+                                      rowHeight);
+    }
 }
 
 void DrumKitEditor::paint (juce::Graphics& g)
@@ -250,34 +263,6 @@ void DrumKitEditor::paint (juce::Graphics& g)
                     "reaches it.", header, juce::Justification::centredRight, false);
     }
 
-    // ---- Sequencer placeholder ----------------------------------------------
-    if (uiState.mode.load() == EditorUiState::Mode::seq)
-    {
-        const auto panel = seqArea.toFloat();
-
-        g.setColour (theme::panel);
-        g.fillRoundedRectangle (panel, 6.0f);
-        g.setColour (theme::outline);
-        g.drawRoundedRectangle (panel, 6.0f, 1.0f);
-
-        auto text = seqArea.reduced (48);
-        const int textWidth = juce::jmin (640, text.getWidth());
-        text = text.withSizeKeepingCentre (textWidth, juce::jmin (text.getHeight(), 130));
-
-        g.setColour (theme::text);
-        g.setFont (theme::font (16.0f, juce::Font::bold));
-        g.drawText ("Sequencer", text.removeFromTop (26), juce::Justification::centred, false);
-
-        text.removeFromTop (8);
-
-        g.setColour (theme::textDim);
-        g.setFont (theme::font (12.0f));
-        g.drawFittedText ("One sequencer per track, each either a grid or a Euclidean pattern, "
-                          "with parameter automation lanes alongside. This page is scaffolding "
-                          "for that work; the instrument itself is fully playable from MIDI and "
-                          "the pads.",
-                          text, juce::Justification::centredTop, 5);
-    }
 }
 
 //==============================================================================
@@ -518,6 +503,9 @@ void DrumKitEditor::refreshFromProcessor()
 
     for (auto& strip : strips)
         strip->updateFromProcessor();
+
+    for (auto& lane : lanes)
+        lane->refreshFromProcessor();
 }
 
 juce::String DrumKitEditor::getTrackNoteLabel (int trackIndex) const

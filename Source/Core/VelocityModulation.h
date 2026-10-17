@@ -118,42 +118,44 @@ struct ModulatedValues
 */
 inline void applyVelocityModulation (const TrackModRefs& refs,
                                      float velocity,
-                                     ModulatedValues& out) noexcept
+                                     ModulatedValues& out,
+                                     const float* sequencerOffsets = nullptr) noexcept
 {
     const float bipolar = velocityBipolar (velocity);
 
-    // A nominal hit must return every knob bit-for-bit as dialled, whatever the depths
-    // are. Returning early matters: even a zero offset would otherwise be pushed through
-    // convertTo0to1/convertFrom0to1, and that round-trip is not exactly lossless.
-    if (std::abs (bipolar) < 1.0e-9f)
-    {
-        for (int i = 0; i < kNumModTargets; ++i)
-            out.values[(size_t) i] = refs.targets[i].value->load();
-
-        return;
-    }
+    // A nominal hit with no sequencer contribution must return every knob bit-for-bit as
+    // dialled, whatever the depths are. Returning the raw value matters: even a zero offset
+    // would otherwise be pushed through convertTo0to1/convertFrom0to1, and that round-trip
+    // is not exactly lossless.
+    const bool velocityIsNeutral = std::abs (bipolar) < 1.0e-9f;
 
     for (int i = 0; i < kNumModTargets; ++i)
     {
         const auto& target = refs.targets[i];
         const float base = target.value->load();
+        const float sequence = sequencerOffsets != nullptr ? sequencerOffsets[i] : 0.0f;
 
-        if (target.range == nullptr || target.depth == nullptr)
+        if (velocityIsNeutral && sequence == 0.0f)
         {
             out.values[(size_t) i] = base;
             continue;
         }
 
-        const float depth = target.depth->load();
-
-        // Depth at zero must also be bit-for-bit the unmodulated value.
-        if (std::abs (depth) < 1.0e-6f)
+        if (target.range == nullptr)
         {
             out.values[(size_t) i] = base;
             continue;
         }
 
-        const float normalised = target.range->convertTo0to1 (base) + depth * bipolar;
+        // Both sources move the parameter in normalised space, so they simply add, and the
+        // clamp keeps either of them from pushing the other past the end of the range.
+        float normalised = target.range->convertTo0to1 (base);
+
+        if (! velocityIsNeutral && target.depth != nullptr)
+            normalised += target.depth->load() * bipolar;
+
+        normalised += sequence;
+
         out.values[(size_t) i] = target.range->convertFrom0to1 (std::clamp (normalised, 0.0f, 1.0f));
     }
 }

@@ -1593,14 +1593,20 @@ void testSequencerCore()
 {
     section ("Sequencer: speeds, Euclidean rhythms, envelopes and polyrhythm");
 
-    // ---- speeds are step durations in beats ----
-    check (std::abs (laneSpeedInBeats (LaneSpeed::halfBeat) - 0.5f) < 1.0e-6f,
-           "1/2 beat is half a beat");
-    check (std::abs (laneSpeedInBeats (LaneSpeed::beat) - 1.0f) < 1.0e-6f, "1 beat is a beat");
-    check (std::abs (laneSpeedInBeats (LaneSpeed::thirdBeat) - 1.0f / 3.0f) < 1.0e-6f,
-           "1/3 beat is a third, so triplets are available");
-    check (laneSpeedInBeats (LaneSpeed::eighthBeat) < laneSpeedInBeats (LaneSpeed::eightBeats),
-           "the speed list is in increasing step length");
+    // ---- speeds are multipliers of a 1/16 note ----
+    check (std::abs (laneSpeedInBeats (LaneSpeed::xOne) - 0.25f) < 1.0e-6f,
+           "x1 is a 1/16 note, which is a quarter of a beat");
+    check (std::abs (laneSpeedInBeats (LaneSpeed::xTwo) - 0.125f) < 1.0e-6f,
+           "x2 halves it, so a 1/32 note");
+    check (std::abs (laneSpeedInBeats (LaneSpeed::xThird) - 0.75f) < 1.0e-6f,
+           "x1/3 triples it, so a 3/16 note",
+           juce::String (laneSpeedInBeats (LaneSpeed::xThird)));
+    check (std::abs (laneSpeedInBeats (LaneSpeed::xHalf) - 0.5f) < 1.0e-6f,
+           "x1/2 is a 1/8 note");
+    check (std::abs (laneSpeedInBeats (LaneSpeed::xEighth) - 2.0f) < 1.0e-6f,
+           "x1/8 is a half note");
+    check (laneSpeedInBeats (LaneSpeed::xEight) < laneSpeedInBeats (LaneSpeed::xEighth),
+           "the speed list runs slow to fast, so a bigger multiplier is a shorter step");
 
     // ---- Euclidean rhythms ----
     {
@@ -1663,7 +1669,7 @@ void testSequencerCore()
         SequencerState state;
         state.lanes[0].type = LaneType::grid;
         state.lanes[0].length = 4;
-        state.lanes[0].speed = LaneSpeed::beat;
+        state.lanes[0].speed = LaneSpeed::xQuarter;   // one beat per step
         state.lanes[0].steps = {};          // all off
         state.lanes[0].steps[0] = true;
         state.lanes[0].steps[2] = true;
@@ -1703,7 +1709,7 @@ void testSequencerCore()
         for (int lane = 0; lane < 2; ++lane)
         {
             state.lanes[(size_t) lane].type = LaneType::grid;
-            state.lanes[(size_t) lane].speed = LaneSpeed::beat;
+            state.lanes[(size_t) lane].speed = LaneSpeed::xQuarter;   // one beat per step
             state.lanes[(size_t) lane].length = lane == 0 ? 3 : 4;
             state.lanes[(size_t) lane].steps = {};
 
@@ -1737,7 +1743,7 @@ void testSequencerCore()
         SequencerState state;
         state.lanes[0].type = LaneType::modulation;
         state.lanes[0].length = 4;
-        state.lanes[0].speed = LaneSpeed::beat;
+        state.lanes[0].speed = LaneSpeed::xQuarter;   // one beat per step
         state.lanes[0].amount = 1.0f;
         state.lanes[0].setDefaultsFor (LaneType::modulation);
 
@@ -1766,7 +1772,7 @@ void testSequencerCore()
         SequencerState state;
         state.lanes[0].type = LaneType::grid;
         state.lanes[0].length = 4;
-        state.lanes[0].speed = LaneSpeed::beat;
+        state.lanes[0].speed = LaneSpeed::xQuarter;   // one beat per step
         state.lanes[0].steps = {};
 
         for (int i = 0; i < kMaxLaneSteps; ++i)
@@ -1784,6 +1790,140 @@ void testSequencerCore()
 
         check (! actions[0].trigger, "a backward seek does too");
     }
+}
+
+/** A transport the offline tests can drive.
+
+    The harness has no host, so without this the sequencer would never run: getPlayHead()
+    returns null and every lane stays still. This is the only way to verify that a lane
+    actually makes a sound.
+*/
+class TestPlayHead final : public juce::AudioPlayHead
+{
+public:
+    double ppq = 0.0;
+    double bpm = 120.0;
+    bool playing = true;
+
+    juce::Optional<PositionInfo> getPosition() const override
+    {
+        PositionInfo info;
+        info.setPpqPosition (ppq);
+        info.setBpm (bpm);
+        info.setIsPlaying (playing);
+        return info;
+    }
+};
+
+void testSequencerAudio()
+{
+    section ("Sequencer: a lane actually plays the kit");
+
+    DrumKitProcessor processor;
+    setSettingsDirectoryOverride (juce::File::getSpecialLocation (juce::File::tempDirectory)
+                                      .getChildFile ("DrumForgeSeqTests"));
+    processor.prepareToPlay (48000.0, 512);
+
+    // Everything silent, so any audio at all has to have come from the sequencer.
+    for (int t = 0; t < kNumTracks; ++t)
+        processor.getModulationState();
+
+    auto& state = processor.getSequencerState();
+    state.lanes[0].setDefaultsFor (LaneType::grid);
+    state.lanes[0].speed = LaneSpeed::xOne;      // a 1/16 note, a quarter of a beat
+    state.lanes[0].length = 4;
+
+    for (int i = 0; i < 4; ++i)
+        state.lanes[0].steps[(size_t) i] = true;
+
+    TestPlayHead playHead;
+    processor.setPlayHead (&playHead);
+
+    juce::AudioBuffer<float> buffer (2, 512);
+
+    const auto peakOf = [&buffer, &processor] () -> float
+    {
+        buffer.clear();
+        juce::MidiBuffer midi;
+        processor.processBlock (buffer, midi);
+        return buffer.getMagnitude (0, buffer.getNumSamples());
+    };
+
+    // Block one adopts the position; the lane must not fire yet.
+    playHead.ppq = 0.0;
+    const float firstBlock = peakOf();
+
+    // Step the transport by exactly one step and render again.
+    playHead.ppq = 0.25;
+    const float secondBlock = peakOf();
+
+    // And keep going for a few steps, because a single hit decays.
+    float loudest = secondBlock;
+
+    for (int i = 0; i < 4; ++i)
+    {
+        playHead.ppq += 0.25;
+        loudest = juce::jmax (loudest, peakOf());
+    }
+
+    check (firstBlock < 1.0e-4f, "the first block after starting does not fire a step",
+           juce::String (firstBlock));
+    check (loudest > 0.01f, "a lane triggers audible output once the transport advances",
+           juce::String (loudest));
+
+    // A stopped transport must not fire.
+    state.lanes[0].type = LaneType::off;
+    playHead.playing = false;
+    playHead.ppq += 1.0;
+
+    // Let whatever is still ringing decay away first, or the test measures the tail of the
+    // previous hits rather than anything the stopped transport did.
+    for (int i = 0; i < 160; ++i)
+        peakOf();
+
+    float afterStop = 0.0f;
+
+    for (int i = 0; i < 4; ++i)
+    {
+        playHead.ppq += 0.25;
+        afterStop = juce::jmax (afterStop, peakOf());
+    }
+
+    check (afterStop < 0.01f, "and a stopped transport fires nothing", juce::String (afterStop));
+
+    // A modulation lane moves the parameter the next hit is built from, without firing.
+    {
+        state.lanes[0].setDefaultsFor (LaneType::modulation);
+        state.lanes[0].modTarget = (int) ModTarget::level;
+        state.lanes[0].amount = 1.0f;
+        state.lanes[0].length = 2;
+        state.lanes[0].speed = LaneSpeed::xOne;
+
+        state.lanes[0].numPoints = 2;
+        state.lanes[0].points[0] = { 0.0f, -1.0f };
+        state.lanes[0].points[1] = { 1.0f, -1.0f };   // pinned at the bottom
+
+        playHead.playing = true;
+        playHead.ppq = 0.0;
+
+        for (int i = 0; i < 160; ++i)
+            peakOf();
+
+        playHead.ppq += 0.25;
+        const float quiet = peakOf();
+
+        state.lanes[0].points[0] = { 0.0f, 1.0f };
+        state.lanes[0].points[1] = { 1.0f, 1.0f };    // pinned at the top
+
+        playHead.ppq += 0.25;
+        const float loud = peakOf();
+
+        check (loud > quiet, "a modulation lane moves the parameter the next hit uses",
+               juce::String (quiet) + " -> " + juce::String (loud));
+    }
+
+    processor.setPlayHead (nullptr);
+    processor.releaseResources();
 }
 
 void testEditorNoteLabels()
@@ -1882,6 +2022,7 @@ int main()
     testRandomiser();
     testNoteMapOptions();
     testSequencerCore();
+    testSequencerAudio();
     testEditorNoteLabels();
 
     std::cout << "\n============================\n"

@@ -326,6 +326,77 @@ depending on whose Mac it runs on is not a test.
 
 ---
 
+## The sequencer
+
+`Source/Core/Sequencer.*` holds the model and the transport; `Source/UI/SequencerLane.*` is
+the editor for one lane. The two are deliberately separate: the transport is testable with no
+UI, and the UI touches only the plain struct.
+
+### The data model
+
+Eight `SequencerLane`s, each with its own type, speed and length. Nothing is shared, which is
+what makes polymeters possible — a 5-step grid against a 7-step grid with the same speed
+drifts and realigns on its own.
+
+**Speed is a multiplier of a 1/16 note**, so `stepBeats = 0.25 / multiplier`. Bigger is
+faster. This is the opposite of the intuitive reading of the numbers ("1/8 is smaller than
+1"), and it was got wrong once: the first implementation treated the values as step lengths
+in beats, which made ×8 eight times *slower* rather than eight times faster. The tell is
+that ×1/3 has to mean a 3/16 step for triplets to work against a straight lane.
+
+### Euclidean rhythms
+
+`euclideanStepOn(step, pulses, steps)` is the closed form `(step * pulses) % steps < pulses`,
+which agrees with Bjorklund for the evenly-distributed cases without the recursion. E(3,8)
+gives `x..x..x.`.
+
+### The transport
+
+`SequencerTransport::advance()` is called once per block with the host's quarter-note position
+and returns one `LaneAction` per lane. Three rules matter:
+
+- **The first block never fires.** It adopts the current step index instead, so pressing play
+  mid-bar does not dump a step into the buffer.
+- **A jump of more than four steps between blocks is a seek.** It re-adopts the position
+  rather than firing everything it passed over. Four is far beyond what any block can advance
+  even at ×8, so it cannot be confused with normal playback.
+- **A stopped transport holds the lanes.** Nothing fires, and a modulation lane keeps
+  reporting its value so an automated parameter does not snap back to its knob position the
+  moment the transport stops.
+
+Steps are resolved at block boundaries, not sample-accurately. At a 512-sample block and
+120 BPM that is under 11 ms of jitter; below that it would need the render split at step
+boundaries, which is a change to the track renderer rather than to the sequencer.
+
+### Modulation lanes
+
+The envelope is evaluated at the current cycle phase and scaled by the lane's `amount`, giving
+an offset in *normalised* parameter space. It is added to the velocity offset inside
+`applyVelocityModulation`, which already works in that space, so the two sources compose
+without either one having to know about the other. The clamp keeps either from pushing the
+other past the end of the range.
+
+The bit-identical guarantee still holds for the case it was written for: a nominal hit with
+no sequencer contribution returns the knob's value untouched.
+
+### Threading
+
+The lane struct is written on the message thread (the page) and read on the audio thread
+(the transport) with no lock. Every field is a plain scalar, so the worst a race can do is
+let one block see a half-applied edit — a step early or late, never a crash or a wedged
+voice. A snapshot-buffer scheme would be stricter, but it would also be a lot of machinery
+for state that is edited at most once per mouse event.
+
+### Testing
+
+The offline harness has no host, so `getPlayHead()` returns null and nothing would ever run.
+`TestPlayHead` in `RenderTests.cpp` supplies a transport the tests advance by hand. Without
+it the sequencer's audio path would be entirely untested — which is exactly the kind of gap
+that ships a sequencer that does nothing.
+
+A test that checks "the stopped transport fires nothing" initially failed because it was
+measuring the previous hit still ringing. It now renders past the decay first.
+
 ## The UI
 
 ### The knobs paint themselves
@@ -599,7 +670,10 @@ bug, which is why they are written down rather than left implicit.
 
 ### UI and build
 
-16. **Note captions refresh on the editor's timer, never in a constructor** — the map can change
+16. **A lane shown for the first time must be refreshed before it is laid out**, because its
+    type decides which controls are visible. `setMode` does this; without it the sequencer
+    page showed every lane as "Off" with its editors missing.
+17. **Note captions refresh on the editor's timer, never in a constructor** — the map can change
     while the editor is open. Switching page must not disturb them either: the note follows the
     map, not the page.
 17. **The kit parameter is polled rather than attached**, so restoring a session does not

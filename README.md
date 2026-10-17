@@ -69,12 +69,11 @@ If you would rather build it yourself, see [AGENTS.md](AGENTS.md#building).
 
 ### The window
 
-A bar across the top holds the wordmark, the name of the kit currently loaded, the global
-`Master` level, the shared reverb (`Size`, `Damp`, `Mix`, `Width`), and the menu button at
-the far right.
+A bar across the top holds the wordmark, the name of the kit currently loaded, and the menu
+button at the far right.
 
-Under it are three page tabs — **SYNTH**, **MOD** and **SEQ** — and then the eight tracks,
-one to a row.
+Under it are four page tabs — **SYNTH**, **MOD**, **SEQ** and **FX** — and then the eight
+tracks, one to a row.
 
 Each track row, left to right:
 
@@ -102,8 +101,10 @@ knob edits its depth rather than its value — the same thing the rim drag does 
 page, but with a far larger target. Every row goes hot while you are there, so the mode is
 never ambiguous.
 
-**SEQ** will hold the sequencers. It is scaffolding today: the page exists so the shape of the
-instrument is settled, but the instrument is fully playable from MIDI and the pads.
+**SEQ** holds one sequencer lane per track — see below.
+
+**FX** holds the shared reverb. It used to sit in the top bar; moving it here is what freed
+the space for the sequencer.
 
 ### The engines
 
@@ -289,6 +290,53 @@ above it, 60 to 67, with no aliases.
 
 The map is saved with your session, and a new instance starts on whichever map you chose
 last.
+
+---
+
+### The sequencer
+
+Each track has its own lane, and each lane has its **own length and its own speed**. That
+combination is what produces polymeters: a five-step lane against a seven-step lane drifts
+against itself and comes back around. Nothing is shared between lanes.
+
+A lane is one of four things:
+
+| Type | What it does |
+|---|---|
+| **Off** | Nothing |
+| **Grid** | A pattern of steps you click on and off, up to 32 of them |
+| **Euclidean** | Pulses spread as evenly as possible across the steps, so 3 across 8 gives `x..x..x.` |
+| **Modulation** | A breakpoint envelope that sweeps one parameter |
+
+**Speed is a multiplier of a 1/16 note**, so a bigger number is faster:
+
+| Multiplier | Step length | At 120 BPM |
+|---|---|---|
+| ×1/8 | a 1/2 note | 1000 ms |
+| ×1/4 | a 1/4 note | 500 ms |
+| ×1/3 | a 3/16 note | 375 ms |
+| ×1/2 | a 1/8 note | 250 ms |
+| **×1** | a 1/16 note | 125 ms |
+| ×2 | a 1/32 note | 62.5 ms |
+| ×3 | a 1/48 note | 41.7 ms |
+| ×4 | a 1/64 note | 31.3 ms |
+| ×6 | a 1/96 note | 20.8 ms |
+| ×8 | a 1/128 note | 15.6 ms |
+
+The odd ratios are the point: ×1/3 and ×3 give triplet feels against straight lanes on the
+same bar, which is a 3-against-4 polyrhythm without changing either lane's length.
+
+**Modulation lanes** are drawn by clicking to add a breakpoint and dragging it to move it.
+The envelope spans the lane's length, so a long slow lane is a slow sweep. Its **amount**
+sets how much of the parameter's travel it covers, and it is added on top of whatever the
+knob and velocity modulation are already doing.
+
+The sequencer follows the host's transport: it starts when you press play, and stops when you
+stop. A lane never fires on the first block after you hit play, so starting mid-bar does not
+dump a step into the buffer, and seeking past a run of steps does not fire them all at once.
+
+> The lanes are not yet saved with your session or with a kit — that is the next piece of
+> work. Everything else on this page is live.
 
 ---
 
