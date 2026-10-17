@@ -49,6 +49,13 @@ void DrumKitProcessor::setNoteMap (NoteMap map)
 
 void DrumKitProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
+    // A host calls setRateAndBufferSizeDetails before this, but the offline tools and tests
+    // call prepareToPlay directly, and without it getSampleRate() stays 0. The sequencer
+    // converts beats to samples with it, so a zero rate turned one block into two thousand
+    // beats and the lane fired until it hit the event cap.
+    if (getSampleRate() <= 0.0)
+        setRateAndBufferSizeDetails (sampleRate, samplesPerBlock);
+
     preparedBlockSize = std::max (64, samplesPerBlock);
 
     mixBuffer.setSize (2, preparedBlockSize, false, true, true);
@@ -139,19 +146,15 @@ void DrumKitProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
         }
 
         const double beatsPerSample = bpm / (60.0 * juce::jmax (1.0, getSampleRate()));
-        const double blockBeats = (double) numSamples * beatsPerSample;
 
         SequencerOutput output;
-        transport.advance (sequencer, ppq, ppq + blockBeats, playing, output);
+        transport.advance (sequencer, ppq, beatsPerSample, numSamples, playing, output);
 
         for (auto& trackOffsets : sequenceOffsets)
             trackOffsets.fill (0.0f);
 
         for (int t = 0; t < kNumTracks; ++t)
         {
-            if (output.trigger[(size_t) t])
-                triggerTrackInternal (t, output.triggerVelocity[(size_t) t]);
-
             sequenceOffsets[(size_t) t] = output.offsets[(size_t) t];
 
             triggerPhase[(size_t) t].store (output.triggerPhase[(size_t) t],
@@ -162,6 +165,10 @@ void DrumKitProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
                     output.automationPhase[(size_t) t][(size_t) slot],
                     std::memory_order_relaxed);
         }
+
+        // The triggers are not fired here. They carry a sample offset, and are fired from
+        // inside the render loop below so the hit lands where it belongs in the block.
+        pendingTriggers = output;
     }
 
     // ---- Render, honouring sample-accurate MIDI positions ---------------------
@@ -194,10 +201,33 @@ void DrumKitProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
     };
 
     int position = 0;
+    int nextTrigger = 0;
+
+    // Fires every sequencer trigger at or before `limit`, rendering up to each one first so
+    // the decay that follows starts on the right sample.
+    const auto fireTriggersUpTo = [&] (int limit)
+    {
+        while (nextTrigger < pendingTriggers.numTriggers
+                 && pendingTriggers.triggers[(size_t) nextTrigger].sampleOffset <= limit)
+        {
+            const auto& event = pendingTriggers.triggers[(size_t) nextTrigger];
+
+            if (event.sampleOffset > position)
+            {
+                renderRange (position, event.sampleOffset - position);
+                position = event.sampleOffset;
+            }
+
+            triggerTrackInternal (event.track, event.velocity);
+            ++nextTrigger;
+        }
+    };
 
     for (const auto metadata : midiMessages)
     {
         const int eventSample = juce::jlimit (0, numSamples, metadata.samplePosition);
+
+        fireTriggersUpTo (eventSample);
 
         if (eventSample > position)
         {
@@ -207,6 +237,8 @@ void DrumKitProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
 
         handleMidiMessage (metadata.getMessage());
     }
+
+    fireTriggersUpTo (numSamples);
 
     if (position < numSamples)
         renderRange (position, numSamples - position);

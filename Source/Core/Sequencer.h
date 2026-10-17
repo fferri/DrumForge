@@ -169,17 +169,29 @@ struct SequencerState
 };
 
 /** What the transport produced for one block. */
+/** How many triggers one block can carry.
+
+    A block can hold several steps of the same lane - at x8 that is a 1/128 note, 15.6 ms,
+    short enough to fit more than once in a large buffer. 64 covers eight lanes firing eight
+    times each, well beyond anything musical. */
+constexpr int kMaxTriggerEvents = 64;
+
+/** One trigger, positioned within the block so it can be rendered at the right sample. */
+struct TriggerEvent
+{
+    int sampleOffset = 0;
+    int track = 0;
+    float velocity = 0.0f;
+};
+
 struct SequencerOutput
 {
-    /** A trigger lane wants to fire this block. */
-    std::array<bool, (size_t) kNumTracks> trigger {};
+    /** Triggers for this block, ordered by sample offset. */
+    std::array<TriggerEvent, (size_t) kMaxTriggerEvents> triggers {};
+    int numTriggers = 0;
 
-    /** Summed automation offsets per track, in normalised parameter space, -1..+1. Lanes
-        aimed at the same parameter add up. */
+    /** Summed automation offsets per track, in normalised parameter space, -1..+1. */
     std::array<std::array<float, (size_t) kNumModTargets>, (size_t) kNumTracks> offsets {};
-
-    /** How hard each track's trigger fires this block, 0..1. */
-    std::array<float, (size_t) kNumTracks> triggerVelocity {};
 
     /** Where each lane is in its cycle, 0..1. The editor draws a playhead from this. */
     std::array<float, (size_t) kNumTracks> triggerPhase {};
@@ -203,12 +215,15 @@ class SequencerTransport
 public:
     void reset() noexcept;
 
-    void advance (const SequencerState&, double ppqStart, double ppqEnd, bool playing,
-                  SequencerOutput& out) noexcept;
+    /** `beatsPerSample` converts a distance in beats to a sample offset, and `numSamples` is
+        the length of the block being rendered.
 
-private:
-    std::array<double, (size_t) kNumTracks> lastStep {};
-    std::array<bool, (size_t) kNumTracks> primed {};
+        Every step boundary inside the block is reported, not just the last one: a large
+        buffer at a fast speed contains more than one, and the earlier version silently
+        dropped all but the final step.
+    */
+    void advance (const SequencerState&, double ppqStart, double beatsPerSample, int numSamples,
+                  bool playing, SequencerOutput& out) noexcept;
 };
 
 } // namespace df

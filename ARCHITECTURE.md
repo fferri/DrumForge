@@ -364,9 +364,21 @@ and returns one `LaneAction` per lane. Three rules matter:
   reporting its value so an automated parameter does not snap back to its knob position the
   moment the transport stops.
 
-Steps are resolved at block boundaries, not sample-accurately. At a 512-sample block and
-120 BPM that is under 11 ms of jitter; below that it would need the render split at step
-boundaries, which is a change to the track renderer rather than to the sequencer.
+Triggers are sample-accurate. The transport does not fire anything itself: it returns a list
+of `TriggerEvent`s, each carrying the sample offset it belongs at, and `processBlock` merges
+that list with the MIDI stream and calls `renderRange` up to each event before firing it. That
+loop already existed for MIDI, so the sequencer joined it rather than duplicating it.
+
+Enumerating boundaries is also a correctness fix, not only a timing one. The earlier version
+compared the current step with the previous one and fired at most once per block, so a block
+spanning two boundaries silently dropped the first. At x8 (a 1/128 note, 15.6 ms) and a
+1024-sample buffer that is every other step failing to play.
+
+One trap came out of this: `getSampleRate()` is zero until a host calls
+`setRateAndBufferSizeDetails`, which hosts do but the offline tools do not. The transport
+divides by the rate to convert beats to samples, so a zero rate turned one block into
+thousands of beats and a lane fired until it hit the event cap. `prepareToPlay` now records
+the rate if it is not already set.
 
 ### Modulation lanes
 

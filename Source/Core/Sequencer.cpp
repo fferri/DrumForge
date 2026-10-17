@@ -1,5 +1,6 @@
 #include "Sequencer.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include <juce_core/juce_core.h>
@@ -344,24 +345,27 @@ void sequencerStateFromValueTree (const juce::ValueTree& tree, SequencerState& s
 
 void SequencerTransport::reset() noexcept
 {
-    lastStep.fill (0.0);
-    primed.fill (false);
+    // Nothing to reset. The transport is stateless now: every block is worked out from the
+    // host's position alone, which is why a seek needs no special handling either.
 }
 
-void SequencerTransport::advance (const SequencerState& state, double ppqStart, double ppqEnd,
+void SequencerTransport::advance (const SequencerState& state, double ppqStart,
+                                  double beatsPerSample, int numSamples,
                                   bool playing, SequencerOutput& out) noexcept
 {
-    juce::ignoreUnused (ppqEnd);
-
-    for (auto& triggered : out.trigger)
-        triggered = false;
+    out.numTriggers = 0;
 
     for (auto& trackOffsets : out.offsets)
         trackOffsets.fill (0.0f);
 
-    // ---- Automation lanes run whether or not the transport does -------------------------
-    // A stopped transport freezes them at their current phase rather than resetting them, so
-    // an automated parameter does not snap back to its knob position the moment you stop.
+    if (beatsPerSample <= 0.0 || numSamples <= 0)
+        return;
+
+    const double ppqEnd = ppqStart + (double) numSamples * beatsPerSample;
+
+    // ---- Automation lanes ---------------------------------------------------------------
+    // Still evaluated once per block, at its start. A modulation lane is a slow shape by
+    // nature, and moving it to per-sample resolution is a separate change.
     for (int t = 0; t < kNumTracks; ++t)
     {
         for (int slot = 0; slot < kMaxAutomationLanes; ++slot)
@@ -376,7 +380,7 @@ void SequencerTransport::advance (const SequencerState& state, double ppqStart, 
             const double cycle = steps / (double) lane.length;
             const float phase = (float) (cycle - std::floor (cycle));
 
-            out.automationPhase[(size_t) t][(size_t) slot] = (float) phase;
+            out.automationPhase[(size_t) t][(size_t) slot] = phase;
 
             if (! lane.enabled)
                 continue;
@@ -385,60 +389,53 @@ void SequencerTransport::advance (const SequencerState& state, double ppqStart, 
         }
     }
 
-    // ---- Trigger lanes -----------------------------------------------------------------
+    // ---- Trigger lanes ------------------------------------------------------------------
     for (int t = 0; t < kNumTracks; ++t)
     {
         const auto& lane = state.triggers[(size_t) t];
         const double beatsPerStep = (double) laneSpeedInBeats (lane.speed);
 
         if (beatsPerStep <= 0.0 || lane.length <= 0)
-        {
-            primed[(size_t) t] = false;
             continue;
-        }
 
-        const double stepAtStart = ppqStart / beatsPerStep;
-        const long long currentStep = (long long) std::floor (stepAtStart);
-
-        // The playhead position is reported whether or not the lane is enabled or the
-        // transport is running, so the editor can show where the cycle sits.
+        // The playhead position, reported whether or not the lane is running.
         {
-            const double cycle = stepAtStart / (double) lane.length;
+            const double cycle = (ppqStart / beatsPerStep) / (double) lane.length;
             out.triggerPhase[(size_t) t] = (float) (cycle - std::floor (cycle));
         }
 
         if (! playing || ! lane.enabled)
-        {
-            primed[(size_t) t] = false;
             continue;
-        }
 
-        if (! primed[(size_t) t])
-        {
-            // First block after a start or a relocate. Adopt the position without firing, so
-            // pressing play mid-bar does not dump a step into the buffer.
-            lastStep[(size_t) t] = (double) currentStep;
-            primed[(size_t) t] = true;
-        }
-        else if (std::abs ((double) currentStep - lastStep[(size_t) t]) > 4.0)
-        {
-            // A jump far beyond what any block could advance, in either direction: the host
-            // seeked. Re-adopt rather than firing everything the seek passed over.
-            lastStep[(size_t) t] = (double) currentStep;
-        }
-        else if (currentStep != (long long) lastStep[(size_t) t])
-        {
-            lastStep[(size_t) t] = (double) currentStep;
+        // Start at the first boundary at or after the block start. The epsilon keeps a
+        // boundary landing exactly on the block start from being skipped by rounding.
+        const double startStep = ppqStart / beatsPerStep;
+        long long index = (long long) std::ceil (startStep - 1.0e-9);
 
-            const int wrapped = (int) (((currentStep % lane.length) + lane.length) % lane.length);
+        for (; ; ++index)
+        {
+            const double boundary = (double) index * beatsPerStep;
 
-            if (lane.isStepOn (wrapped))
-            {
-                out.trigger[(size_t) t] = true;
-                out.triggerVelocity[(size_t) t] = lane.velocityForStep (wrapped);
-            }
+            if (boundary >= ppqEnd || out.numTriggers >= kMaxTriggerEvents)
+                break;
+
+            const int wrapped = (int) (((index % lane.length) + lane.length) % lane.length);
+
+            if (! lane.isStepOn (wrapped))
+                continue;
+
+            const int offset = juce::jlimit (0, numSamples - 1,
+                (int) std::lround ((boundary - ppqStart) / beatsPerSample));
+
+            out.triggers[(size_t) out.numTriggers] = { offset, t, lane.velocityForStep (wrapped) };
+            ++out.numTriggers;
         }
     }
+
+    // Ordered by position, so the processor can merge them with the MIDI stream in one pass.
+    std::sort (out.triggers.begin(), out.triggers.begin() + out.numTriggers,
+               [] (const TriggerEvent& a, const TriggerEvent& b)
+               { return a.sampleOffset < b.sampleOffset; });
 }
 
 } // namespace df

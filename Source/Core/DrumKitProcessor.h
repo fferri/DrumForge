@@ -165,6 +165,9 @@ private:
     /** Audio-thread only: turns transport position into lane actions. */
     SequencerTransport transport;
 
+    /** Audio-thread only: this block's triggers, waiting to be fired at their sample. */
+    SequencerOutput pendingTriggers;
+
     /** Mirrors of the transport's playhead position, for the editor. */
     std::array<std::atomic<float>, (size_t) kNumTracks> triggerPhase {};
     std::array<std::array<std::atomic<float>, (size_t) kMaxAutomationLanes>,
