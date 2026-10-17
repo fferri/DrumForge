@@ -9,7 +9,7 @@ How the plugin is built and why it is built that way. For *using* InfinityDrum s
 ## The shape of it
 
 One `AudioProcessor` (`DrumKitProcessor`) owns eight `DrumTrack`s and a shared reverb. Each
-track owns **all nine synthesis engines at once** and a pointer to whichever is active.
+track owns **every synthesis engine at once** and a pointer to whichever is active.
 Everything below the UI is plain C++ with no allocation on the audio thread.
 
 The plugin is deliberately small in concept: eight tracks, each a triggerable sound with a
@@ -180,7 +180,7 @@ below for what that implies for the factory kits.
 
 ## Real-time constraints
 
-- **No allocation or locking on the audio thread.** All nine engines are instantiated per
+- **No allocation or locking on the audio thread.** Every engine is instantiated per
   track up front, so changing a track's engine just retargets a pointer.
 - **UI pad clicks reach the audio thread through a lock-free `AbstractFifo`**, not a lock.
 - **Everything the audio thread reads is either a parameter pointer or an atomic.** Depths,

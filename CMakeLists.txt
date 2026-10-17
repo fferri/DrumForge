@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(InfinityDrum VERSION 1.1.1 LANGUAGES C CXX)
+project(InfinityDrum VERSION 1.2.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -57,7 +57,7 @@ juce_add_plugin(InfinityDrum
     PLUGIN_CODE In01
     FORMATS VST3
     PRODUCT_NAME "InfinityDrum"
-    DESCRIPTION "Eight-track drum and percussion synthesiser with nine synthesis engines"
+    DESCRIPTION "Eight-track drum and percussion synthesiser"
     IS_SYNTH TRUE
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT FALSE

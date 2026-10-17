@@ -1,7 +1,7 @@
 # InfinityDrum
 
-An 8-track drum and percussion **VST3 instrument**. Every track can load any of **nine
-synthesis engines**, covering conventional drum synthesis through to inharmonic metal,
+An 8-track drum and percussion **VST3 instrument**. Every track can load any of its
+**synthesis engines**, covering conventional drum synthesis through to inharmonic metal,
 wavefolding and sub drones. There are no samples anywhere in the plugin.
 
 Tracks are triggered over MIDI using either the General MIDI drum map or an Arturia
