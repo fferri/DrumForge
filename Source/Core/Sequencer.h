@@ -64,8 +64,10 @@ enum class TriggerMode
 constexpr int kNumTriggerModes = 2;
 const char* triggerModeName (TriggerMode) noexcept;
 
-/** How many automation lanes a track can carry. */
-constexpr int kMaxAutomationLanes = 4;
+/** One automation lane per controllable parameter, so a lane's index *is* its target. That
+    is what lets the editor show a tab per parameter and know, without asking, which lane
+    belongs to which. */
+constexpr int kMaxAutomationLanes = (int) kNumModTargets;
 
 /** One breakpoint: position along the cycle 0..1, value -1..+1. */
 struct ModPoint
@@ -144,7 +146,6 @@ struct AutomationLane
     LaneSpeed speed = LaneSpeed::xOne;
     int length = 4;
 
-    int target = 0;      ///< a ModTarget index
     float amount = 0.5f; ///< how much of the parameter's travel the envelope reaches
 
     std::array<ModPoint, kMaxModPoints> points {};

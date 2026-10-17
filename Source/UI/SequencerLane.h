@@ -119,6 +119,9 @@ private:
 
     AutomationLane& lane() noexcept;
     const AutomationLane& lane() const noexcept;
+    const AutomationLane& laneAt (int index) const noexcept;
+    juce::Rectangle<int> tabBounds (int index) const noexcept;
+    int tabIndexAt (juce::Point<int>) const noexcept;
 
     void syncControls();
     juce::Rectangle<int> envelopeBounds() const noexcept;
@@ -129,12 +132,11 @@ private:
     int slot = 0;
 
     juce::ToggleButton enabledButton { "On" };
-    std::array<juce::TextButton, kMaxAutomationLanes> slotButtons;
-    juce::ComboBox speedBox, targetBox;
+    juce::ComboBox speedBox;
     ValueStepper lengthStepper { "Steps", 1, kMaxLaneSteps };
     juce::Slider amountSlider;
 
-    juce::Rectangle<int> identityArea, controlsArea, editorBounds;
+    juce::Rectangle<int> tabArea, identityArea, controlsArea, editorBounds;
 
     int draggedPoint = -1;
 

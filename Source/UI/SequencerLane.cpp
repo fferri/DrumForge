@@ -398,43 +398,20 @@ AutomationLaneComponent::AutomationLaneComponent (DrumKitProcessor& owner, int i
     : processor (owner), trackIndex (index)
 {
     speedBox.setTooltip ("How fast the envelope runs.");
-    targetBox.setTooltip ("Which parameter the envelope moves.");
     lengthStepper.setBoundsTo (getLocalBounds());
     lengthStepper.setTooltip ("How many steps the envelope spans before it loops. Its own "
                               "length, independent of the track's trigger sequencer.");
 
-    for (auto* box : { &speedBox, &targetBox })
-    {
-        box->addListener (this);
-        addAndMakeVisible (*box);
-    }
+    speedBox.addListener (this);
+    addAndMakeVisible (speedBox);
 
     enabledButton.setTooltip ("Whether this automation lane runs.");
     enabledButton.onClick = [this] { lane().enabled = enabledButton.getToggleState(); repaint(); };
     addAndMakeVisible (enabledButton);
 
-    // A micro tab bar rather than a combo: with only four lanes, seeing all of them at once
-    // is quicker than opening a list.
-    for (int i = 0; i < kMaxAutomationLanes; ++i)
-    {
-        auto& button = slotButtons[(size_t) i];
-        button.setButtonText (juce::String (i + 1));
-        button.setClickingTogglesState (false);
-        button.setTooltip ("Automation lane " + juce::String (i + 1));
-        button.onClick = [this, i]
-        {
-            slot = i;
-            syncControls();
-            repaint();
-        };
-        addAndMakeVisible (button);
-    }
 
     for (int i = 0; i < kNumLaneSpeeds; ++i)
         speedBox.addItem (laneSpeedName ((LaneSpeed) i), i + 1);
-
-    for (int i = 0; i < kNumModTargets; ++i)
-        targetBox.addItem (modTargetName (i), i + 1);
 
     amountSlider.setSliderStyle (juce::Slider::LinearBar);
     amountSlider.setTextBoxStyle (juce::Slider::TextBoxAbove, false, 56, 14);
@@ -457,8 +434,33 @@ AutomationLane& AutomationLaneComponent::lane() noexcept
 
 const AutomationLane& AutomationLaneComponent::lane() const noexcept
 {
+    return laneAt (slot);
+}
+
+const AutomationLane& AutomationLaneComponent::laneAt (int index) const noexcept
+{
     return processor.getSequencerState()
-        .automation[(size_t) trackIndex][(size_t) juce::jlimit (0, kMaxAutomationLanes - 1, slot)];
+        .automation[(size_t) trackIndex][(size_t) juce::jlimit (0, kMaxAutomationLanes - 1, index)];
+}
+
+juce::Rectangle<int> AutomationLaneComponent::tabBounds (int index) const noexcept
+{
+    if (tabArea.isEmpty() || ! juce::isPositiveAndBelow (index, kMaxAutomationLanes))
+        return {};
+
+    const int width = tabArea.getWidth() / kMaxAutomationLanes;
+
+    return juce::Rectangle<int> (tabArea.getX() + width * index, tabArea.getY(),
+                                 width, tabArea.getHeight()).reduced (1, 0);
+}
+
+int AutomationLaneComponent::tabIndexAt (juce::Point<int> position) const noexcept
+{
+    for (int i = 0; i < kMaxAutomationLanes; ++i)
+        if (tabBounds (i).contains (position))
+            return i;
+
+    return -1;
 }
 
 void AutomationLaneComponent::refreshFromProcessor()
@@ -471,24 +473,8 @@ void AutomationLaneComponent::syncControls()
 {
     const auto& current = lane();
 
-    for (int i = 0; i < kMaxAutomationLanes; ++i)
-    {
-        const bool active = i == slot;
-        auto& button = slotButtons[(size_t) i];
-
-        button.setToggleState (active, juce::dontSendNotification);
-        button.setColour (juce::TextButton::buttonColourId,
-                          active ? theme::accent : theme::panelAlt);
-        button.setColour (juce::TextButton::textColourOffId,
-                          active ? theme::background : theme::textDim);
-        button.setColour (juce::TextButton::textColourOnId,
-                          active ? theme::background : theme::textDim);
-    }
-
     enabledButton.setToggleState (current.enabled, juce::dontSendNotification);
     speedBox.setSelectedId ((int) current.speed + 1, juce::dontSendNotification);
-    targetBox.setSelectedId (juce::jlimit (0, kNumModTargets - 1, current.target) + 1,
-                             juce::dontSendNotification);
     lengthStepper.setValue (current.length, juce::dontSendNotification);
     amountSlider.setValue ((double) current.amount * 100.0f, juce::dontSendNotification);
 }
@@ -499,8 +485,6 @@ void AutomationLaneComponent::comboBoxChanged (juce::ComboBox* box)
 
     if (box == &speedBox)
         current.speed = (LaneSpeed) juce::jlimit (0, kNumLaneSpeeds - 1, speedBox.getSelectedId() - 1);
-    else if (box == &targetBox)
-        current.target = juce::jlimit (0, kNumModTargets - 1, targetBox.getSelectedId() - 1);
 
     repaint();
 }
@@ -513,7 +497,12 @@ void AutomationLaneComponent::sliderValueChanged (juce::Slider*)
 
 void AutomationLaneComponent::resized()
 {
-    auto area = getLocalBounds().reduced (8, 5);
+    auto area = getLocalBounds().reduced (8, 4);
+
+    // The parameter tabs run the full width, so all nine are readable at once and it is
+    // obvious which parameters are being automated.
+    tabArea = area.removeFromTop (16);
+    area.removeFromTop (2);
 
     identityArea = area.removeFromLeft (84);
     area.removeFromLeft (6);
@@ -523,22 +512,11 @@ void AutomationLaneComponent::resized()
     controlsArea = area.removeFromLeft (118);
     {
         auto stack = controlsArea;
-        const int cellHeight = juce::jmin (20, (stack.getHeight() - 6) / 4);
+        const int cellHeight = juce::jmin (20, (stack.getHeight() - 4) / 2);
 
-        {
-            auto tabs = stack.removeFromTop (cellHeight);
-
-            for (auto& button : slotButtons)
-                button.setBounds (tabs.removeFromLeft (tabs.getWidth() / juce::jmax (1,
-                    (int) slotButtons.size())).reduced (1, 0));
-        }
-
-        stack.removeFromTop (2);
         speedBox.setBounds (stack.removeFromTop (cellHeight));
         stack.removeFromTop (2);
         lengthStepper.setBounds (stack.removeFromTop (cellHeight));
-        stack.removeFromTop (2);
-        targetBox.setBounds (stack.removeFromTop (cellHeight));
     }
 
     area.removeFromLeft (10);
@@ -588,6 +566,14 @@ int AutomationLaneComponent::findPointAt (juce::Point<int> position) const noexc
 
 void AutomationLaneComponent::mouseDown (const juce::MouseEvent& event)
 {
+    if (const int tab = tabIndexAt (event.getPosition()); tab >= 0)
+    {
+        slot = tab;
+        syncControls();
+        repaint();
+        return;
+    }
+
     auto& current = lane();
 
     const auto area = envelopeBounds();
@@ -667,6 +653,35 @@ void AutomationLaneComponent::paint (juce::Graphics& g)
     g.fillRoundedRectangle (bounds, 5.0f);
     g.setColour (theme::outline);
     g.drawRoundedRectangle (bounds, 5.0f, 1.0f);
+
+    // ---- Parameter tabs ------------------------------------------------------
+    // One per controllable parameter. The base is neutral, the current one is outlined, and
+    // a filled one means that parameter has automation running - so the row says at a glance
+    // what is being automated, not just what you are looking at.
+    for (int i = 0; i < kMaxAutomationLanes; ++i)
+    {
+        const auto bounds = tabBounds (i);
+
+        if (bounds.isEmpty())
+            continue;
+
+        const bool selected = i == slot;
+        const bool active = laneAt (i).enabled;
+
+        g.setColour (active ? (selected ? theme::accent : theme::accent.withAlpha (0.5f))
+                            : theme::panelAlt);
+        g.fillRoundedRectangle (bounds.toFloat(), 2.0f);
+
+        if (selected)
+        {
+            g.setColour (theme::text);
+            g.drawRoundedRectangle (bounds.toFloat().reduced (0.5f), 2.0f, 1.4f);
+        }
+
+        g.setColour (active ? (selected ? theme::background : theme::text) : theme::textDim);
+        g.setFont (theme::font (9.0f, selected ? juce::Font::bold : juce::Font::plain));
+        g.drawText (modTargetName (i), bounds, juce::Justification::centred, false);
+    }
 
     const int model = processor.getSelectedModel (trackIndex);
     const auto& info = getModelInfo (juce::jlimit (0, kNumModels - 1, model));

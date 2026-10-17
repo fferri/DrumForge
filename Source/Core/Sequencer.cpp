@@ -254,15 +254,21 @@ juce::ValueTree sequencerStateToValueTree (const SequencerState& state)
         track.setProperty ("steps", bits, nullptr);
         track.setProperty ("velocities", velocities, nullptr);
 
-        for (const auto& automation : state.automation[(size_t) t])
+        for (int slot = 0; slot < kMaxAutomationLanes; ++slot)
         {
+            const auto& automation = state.automation[(size_t) t][(size_t) slot];
+
             juce::ValueTree node (automationNodeType);
             node.setProperty ("enabled", automation.enabled, nullptr);
             node.setProperty ("speed", (int) automation.speed, nullptr);
             node.setProperty ("length", automation.length, nullptr);
-            node.setProperty ("target", automation.target, nullptr);
             node.setProperty ("amount", automation.amount, nullptr);
             node.setProperty ("points", encodePoints (automation), nullptr);
+
+            // Written as well as implied by the position, so a session from the four-lane
+            // layout still decodes into the right slot.
+            node.setProperty ("target", slot, nullptr);
+
             track.appendChild (node, nullptr);
         }
 
@@ -313,26 +319,25 @@ void sequencerStateFromValueTree (const juce::ValueTree& tree, SequencerState& s
                     (float) storedVelocities[i].getIntValue());
         }
 
-        auto automationChildren = 0;
-
         for (int c = 0; c < track.getNumChildren(); ++c)
         {
             const auto node = track.getChild (c);
 
-            if (! node.hasType (automationNodeType) || automationChildren >= kMaxAutomationLanes)
+            if (! node.hasType (automationNodeType))
                 continue;
 
-            auto& automation = state.automation[(size_t) t][(size_t) automationChildren];
+            // The target says which slot it belongs to. Older sessions stored up to four
+            // lanes with scattered targets; reading by target keeps them where they were.
+            const int slot = juce::jlimit (0, kMaxAutomationLanes - 1,
+                                           (int) node.getProperty ("target", c));
+
+            auto& automation = state.automation[(size_t) t][(size_t) slot];
             automation.enabled = (bool) node.getProperty ("enabled", false);
             automation.speed = (LaneSpeed) juce::jlimit (0, kNumLaneSpeeds - 1,
                                                          (int) node.getProperty ("speed", (int) LaneSpeed::xOne));
             automation.length = juce::jlimit (1, kMaxLaneSteps, (int) node.getProperty ("length", 4));
-            automation.target = juce::jlimit (0, kNumModTargets - 1,
-                                              (int) node.getProperty ("target", 0));
             automation.amount = juce::jlimit (0.0f, 1.0f, (float) (double) node.getProperty ("amount", 0.5));
             decodePoints (node.getProperty ("points").toString(), automation);
-
-            ++automationChildren;
         }
     }
 }
@@ -359,10 +364,10 @@ void SequencerTransport::advance (const SequencerState& state, double ppqStart, 
     // an automated parameter does not snap back to its knob position the moment you stop.
     for (int t = 0; t < kNumTracks; ++t)
     {
-        for (const auto& lane : state.automation[(size_t) t])
+        for (int slot = 0; slot < kMaxAutomationLanes; ++slot)
         {
+            const auto& lane = state.automation[(size_t) t][(size_t) slot];
             const double beatsPerStep = (double) laneSpeedInBeats (lane.speed);
-            const int slot = (int) (&lane - state.automation[(size_t) t].data());
 
             if (beatsPerStep <= 0.0 || lane.length <= 0)
                 continue;
@@ -376,9 +381,7 @@ void SequencerTransport::advance (const SequencerState& state, double ppqStart, 
             if (! lane.enabled)
                 continue;
 
-            if (juce::isPositiveAndBelow (lane.target, kNumModTargets))
-                out.offsets[(size_t) t][(size_t) lane.target]
-                    += lane.modulationAt (phase) * lane.amount;
+            out.offsets[(size_t) t][(size_t) slot] += lane.modulationAt (phase) * lane.amount;
         }
     }
 

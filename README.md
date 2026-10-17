@@ -349,15 +349,19 @@ Rhythm and movement are separate decisions, so they live on separate pages. **AU
 each track up to **four automation lanes**, each a breakpoint envelope sweeping one
 parameter:
 
-- **1 2 3 4** — which of the track's four lanes you are editing, as micro-tabs so all four
-  are visible at once.
-- **On** — whether that lane runs, under the track name. Automation lanes start **off**,
+- **A tab per parameter** across the top of the lane — `Decay`, `Tone`, `Character`, `Sweep`,
+  `Tune`, `Level`, `Drive`, `Pan`, `Send` — so all nine are visible at once. The current tab
+  is outlined; the ones with automation running are filled, so the row shows what is being
+  automated without you having to look.
+- **On** — whether the selected lane runs, under the track name. Automation lanes start **off**,
   because four ramps per track sweeping from the moment you open the plugin is not a
   sensible default.
 - **Speed** and **Steps** — its own, so each lane loops on its own length, independently of
-  the track's trigger sequencer and of the other three automation lanes.
-- **Target** — any of the nine per-track parameters.
-- **Amount** — how far the envelope moves it.
+  the track's trigger sequencer and of every other parameter's lane.
+- **Amount** — how far the envelope moves the parameter.
+
+Each parameter has exactly one lane, which is why the tabs can stand in for a target
+selector: the lane you are editing *is* the parameter.
 
 Click in the envelope to add a breakpoint, drag one to move it. Lanes aimed at the same
 parameter add up, and the result is layered on top of whatever the knob and the velocity

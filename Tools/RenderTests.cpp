@@ -1791,11 +1791,12 @@ void testSequencerCore()
     {
         SequencerState state;
         state.triggers[0].enabled = false;                 // no rhythm at all
-        state.automation[0][0].speed = LaneSpeed::xQuarter;
-        state.automation[0][0].enabled = true;
-        state.automation[0][0].length = 4;
-        state.automation[0][0].target = (int) ModTarget::level;
-        state.automation[0][0].amount = 1.0f;
+        // A lane's position in the array *is* its target.
+        auto& levelLane = state.automation[0][(size_t) ModTarget::level];
+        levelLane.speed = LaneSpeed::xQuarter;
+        levelLane.enabled = true;
+        levelLane.length = 4;
+        levelLane.amount = 1.0f;
 
         SequencerTransport transport;
         SequencerOutput output;
@@ -1812,29 +1813,36 @@ void testSequencerCore()
                juce::String (halfway));
     }
 
-    // ---- several automation lanes add up, and can share a target ----
+    // ---- one lane per parameter, and they do not interfere ----
     {
         SequencerState state;
 
-        for (int slot = 0; slot < 2; ++slot)
+        const auto pinHigh = [] (AutomationLane& lane)
         {
-            auto& lane = state.automation[0][(size_t) slot];
             lane.speed = LaneSpeed::xQuarter;
             lane.enabled = true;
             lane.length = 4;
-            lane.target = (int) ModTarget::level;
             lane.amount = 0.5f;
             lane.numPoints = 1;
-            lane.points[0] = { 0.0f, 1.0f };   // pinned high
-        }
+            lane.points[0] = { 0.0f, 1.0f };
+        };
+
+        auto& levelLane = state.automation[0][(size_t) ModTarget::level];
+        auto& panLane = state.automation[0][(size_t) ModTarget::pan];
+        pinHigh (levelLane);
+        pinHigh (panLane);
 
         SequencerTransport transport;
         SequencerOutput output;
         transport.advance (state, 0.0, 0.1, true, output);
 
-        check (std::abs (output.offsets[0][(size_t) ModTarget::level] - 1.0f) < 1.0e-4f,
-               "two lanes aimed at the same parameter sum",
+        check (std::abs (output.offsets[0][(size_t) ModTarget::level] - 0.5f) < 1.0e-4f,
+               "the lane under Level moves level",
                juce::String (output.offsets[0][(size_t) ModTarget::level]));
+        check (std::abs (output.offsets[0][(size_t) ModTarget::pan] - 0.5f) < 1.0e-4f,
+               "the lane under Pan moves pan");
+        check (output.offsets[0][(size_t) ModTarget::decay] == 0.0f,
+               "and a parameter with no lane stays where its knob was put");
     }
 }
 
@@ -1925,11 +1933,10 @@ void testSequencerAudio()
 
     // An automation lane moves the parameter the next hit is built from.
     {
-        auto& lane = state.automation[0][0];
+        auto& lane = state.automation[0][(size_t) ModTarget::level];
         lane.enabled = true;
         lane.speed = LaneSpeed::xOne;
         lane.length = 2;
-        lane.target = (int) ModTarget::level;
         lane.amount = 1.0f;
         lane.numPoints = 2;
         lane.points[0] = { 0.0f, -1.0f };
@@ -2000,14 +2007,14 @@ void testSequencerPersistence()
 
     lanes.triggers[1].steps[2].velocity = 64.0f;
 
-    lanes.automation[0][0].enabled = true;
-    lanes.automation[0][0].speed = LaneSpeed::xQuarter;
-    lanes.automation[0][0].length = 3;
-    lanes.automation[0][0].target = (int) ModTarget::pan;
-    lanes.automation[0][0].amount = 0.75f;
-    lanes.automation[0][0].numPoints = 3;
-    lanes.automation[0][0].points[0] = { 0.0f, -0.5f };
-    lanes.automation[0][0].points[1] = { 0.4f, 1.0f };
+    auto& panic = lanes.automation[0][(size_t) ModTarget::pan];
+    panic.enabled = true;
+    panic.speed = LaneSpeed::xQuarter;
+    panic.length = 3;
+    panic.amount = 0.75f;
+    panic.numPoints = 3;
+    panic.points[0] = { 0.0f, -0.5f };
+    panic.points[1] = { 0.4f, 1.0f };
     lanes.automation[0][0].points[2] = { 1.0f, -1.0f };
 
     juce::MemoryBlock saved;
@@ -2040,10 +2047,11 @@ void testSequencerPersistence()
            "a step's velocity comes back with it",
            juce::String (back.triggers[1].steps[2].velocity));
 
-    const auto& automation = back.automation[0][0];
+    // The lane is stored under the parameter it automates, so reading it back by that index
+    // is itself the check that the target survived.
+    const auto& automation = back.automation[0][(size_t) ModTarget::pan];
 
-    check (automation.enabled, "the automation lane comes back enabled");
-    check (automation.target == (int) ModTarget::pan, "with its target");
+    check (automation.enabled, "the automation lane comes back enabled, under its parameter");
     check (automation.length == 3, "and its own length");
     check (std::abs (automation.amount - 0.75f) < 1.0e-4f, "and its amount");
 
