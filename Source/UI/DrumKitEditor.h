@@ -15,7 +15,16 @@
 namespace df
 {
 
-/** The plugin window: a global bar across the top and eight track strips below. */
+/** The plugin window.
+
+    Three bands: a top bar holding the wordmark, the current kit name, the global knobs and
+    the main menu; a tab bar switching between SYNTH, MOD and SEQ; and the content area,
+    which is eight track rows or, on the sequencer page, its placeholder.
+
+    Everything app-level lives in the main menu rather than on the tracks: kits (load, save,
+    import, export, delete) and the MIDI note map. Right-clicking a track pad used to offer
+    the note map; that moved here because it is a property of the whole instrument.
+*/
 class DrumKitEditor final : public juce::AudioProcessorEditor,
                             private juce::Timer
 {
@@ -32,30 +41,38 @@ public:
     /** What a track's header note caption currently reads. */
     juce::String getTrackNoteLabel (int trackIndex) const;
 
+    /** Switches page. Public so a test can drive it without synthesising clicks. */
+    void setMode (EditorUiState::Mode mode);
+    EditorUiState::Mode getMode() const noexcept { return uiState.mode.load(); }
+
 private:
     void timerCallback() override;
 
-    void showKitMenu();
-    void showNoteMapMenu();
-    void handleKitMenuResult (int result);
+    void showMainMenu();
+    void handleMainMenuResult (int result);
+
     void loadKit (int index);
     void saveCurrentKitAs();
+    void importKitFromFile();
+    void exportCurrentKitToFile();
     void deleteCurrentKit();
-    void refreshKitButton();
+    void refreshKitLabel();
+    void updateContentVisibility();
 
     /** The editor's own processor, already available as `processor` on the base class. */
     DrumKitProcessor& kit() const noexcept { return static_cast<DrumKitProcessor&> (processor); }
 
-    static constexpr int headerHeight = 74;
+    static constexpr int topBarHeight = 70;
+    static constexpr int tabBarHeight = 34;
 
     DrumForgeLookAndFeel lookAndFeel;
     juce::TooltipWindow tooltipWindow { this, 650 };
 
     KitLibrary library;
 
-    juce::TextButton kitButton;
-    juce::TextButton saveKitButton { "SAVE" };
-    juce::TextButton modButton { "MOD" };
+    juce::Label kitLabel;
+    MenuButton menuButton;
+    std::array<juce::TextButton, 3> tabButtons;
 
     EditorUiState uiState;
 
@@ -63,7 +80,8 @@ private:
     std::unique_ptr<ModelKnob> masterKnob;
     std::array<std::unique_ptr<ModelKnob>, 4> reverbKnobs;
 
-    juce::Rectangle<int> headerArea, titleArea, kitArea, kitCaptionArea, modArea, globalKnobArea;
+    juce::Rectangle<int> topBarArea, titleArea, kitLabelArea, menuButtonArea, globalsArea,
+                        tabBarArea, hintArea, trackArea, seqArea;
 
     /** The kit the editor last loaded, or -1 once the current sound matches no kit. */
     int currentKitIndex = -1;

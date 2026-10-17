@@ -5,17 +5,24 @@
 namespace df
 {
 
-/** Editor-wide UI state that individual controls need to read.
+/** Which page the editor is showing, and the state the pages share.
 
-    Currently just the modulation-arming flag. It lives in a shared object rather than in
-    the editor because the knobs need it on every paint and every mouse event, and reaching
-    it by walking up the parent chain would be fragile.
-
-    Not a parameter: arming is a transient editing mode, not part of the sound.
+    The audio thread never reads this. It only changes how the knobs respond to a drag and
+    what the editor draws, so it is plain UI state rather than a parameter.
 */
 struct EditorUiState
 {
-    std::atomic<bool> modArmed { false };
+    enum class Mode
+    {
+        synth = 0,   ///< editing the sound itself
+        mod,         ///< editing modulation depths
+        seq          ///< sequencers
+    };
+
+    std::atomic<Mode> mode { Mode::synth };
+
+    bool isModulationMode() const noexcept { return mode.load() == Mode::mod; }
+    bool isSynthMode() const noexcept { return mode.load() == Mode::synth; }
 };
 
 } // namespace df

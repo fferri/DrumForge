@@ -23,9 +23,6 @@ class PadButton final : public juce::Component,
 public:
     std::function<void (float velocity)> onHit;
 
-    /** Fired on right-click, so the editor can offer its settings menu from the pad. */
-    std::function<void()> onContextMenu;
-
     void setAccentColour (juce::Colour newAccent);
     void setSubtitle (juce::String newSubtitle);
     void setTitle (juce::String newTitle);
@@ -46,8 +43,11 @@ private:
 };
 
 //==============================================================================
-/** One complete track: pad, engine selector, the four engine macros and the five
-    per-track controls, plus mute/solo and a level meter.
+/** One complete track, laid out as a horizontal row.
+
+    Left to right: the track's identity, its pad, the engine and distortion selectors, the
+    nine knobs, then `RND`, mute/solo and the level meter. The knobs absorb whatever width is
+    left over, so the row fills the window at any size.
 */
 class TrackStrip final : public juce::Component
 {
@@ -60,10 +60,6 @@ public:
     /** Called from the editor's timer: syncs the engine selector, meters and glow. */
     void updateFromProcessor();
 
-    /** Right-clicking a pad is the discoverable way into the note map, since the pads are
-        what responds to it. */
-    std::function<void()> onPadContextMenu;
-
     int getTrackIndex() const noexcept { return trackIndex; }
 
     /** The note caption in this track's header, as currently displayed. Exposed so the
@@ -72,6 +68,9 @@ public:
     juce::String getNoteLabel() const { return noteLabel; }
 
 private:
+    /** Height shared by the combo boxes, buttons and meter in a row. */
+    static constexpr int rowControlHeight = 24;
+
     void updateModelDependentUi();
     void commitModelSelection (int modelIndex);
     void layoutKnobGrid (juce::Rectangle<int> area, int columns, int rows,
@@ -96,7 +95,7 @@ private:
     Rng randomRng;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> distAttachment;
 
-    juce::Rectangle<int> headerArea, headerButtonArea, padArea, meterArea, comboArea, distArea, macroArea, utilArea;
+    juce::Rectangle<int> identityArea, padArea, meterArea, comboArea, distArea, knobArea;
 
     juce::String noteLabel;
     NoteMap displayedNoteMap = NoteMap::generalMidi;

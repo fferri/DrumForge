@@ -15,6 +15,7 @@
 
 #include "Core/DrumKitProcessor.h"
 #include "Core/Settings.h"
+#include "UI/DrumKitEditor.h"
 
 using namespace df;
 
@@ -83,7 +84,7 @@ int main (int argc, char** argv)
     }
 
     // Hosts resize the editor; make sure that path works across the whole allowed range.
-    for (auto size : { juce::Point<int> (1120, 660), juce::Point<int> (1280, 752),
+    for (auto size : { juce::Point<int> (1120, 720), juce::Point<int> (1360, 860),
                        juce::Point<int> (1600, 900), juce::Point<int> (2400, 1500) })
     {
         editor->setSize (size.x, size.y);
@@ -100,8 +101,9 @@ int main (int argc, char** argv)
         std::cout << "rendered at " << size.x << "x" << size.y << "\n";
     }
 
-    editor->setSize (1280, 752);
+    editor->setSize (1360, 860);
 
+    // The SYNTH page is the default view, and the bands draw in every mode.
     // Dial in some velocity modulation so the bands are actually visible, deliberately
     // mixing polarities and targets so both gradient directions appear.
     processor.setModulationDepth (0, (int) ModTarget::tone,      0.45f);

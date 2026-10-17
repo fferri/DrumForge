@@ -3,51 +3,66 @@
 namespace df
 {
 
+namespace
+{
+    const char* tabName (EditorUiState::Mode mode) noexcept
+    {
+        switch (mode)
+        {
+            case EditorUiState::Mode::synth: return "SYNTH";
+            case EditorUiState::Mode::mod:   return "MOD";
+            case EditorUiState::Mode::seq:   return "SEQ";
+        }
+
+        return "";
+    }
+
+    // Menu ids. Kit entries occupy 1000 + index, note maps 2000 + index.
+    constexpr int menuSaveKit     = 1;
+    constexpr int menuImportKit   = 2;
+    constexpr int menuExportKit   = 3;
+    constexpr int menuDeleteKit   = 4;
+    constexpr int menuShowFolder  = 5;
+    constexpr int menuKitBase     = 1000;
+    constexpr int menuNoteMapBase = 2000;
+}
+
+//==============================================================================
 DrumKitEditor::DrumKitEditor (DrumKitProcessor& owner)
     : juce::AudioProcessorEditor (owner)
 {
     setLookAndFeel (&lookAndFeel);
 
-    // ---- Kit browser --------------------------------------------------------
-    kitButton.setTooltip ("Browse kits. Built-in kits are always available and cannot be\n"
-                          "changed, so you can always get back to them; saving makes an\n"
-                          "editable copy of your own.");
-    kitButton.onClick = [this] { showKitMenu(); };
-    addAndMakeVisible (kitButton);
+    // ---- Kit name and the main menu -----------------------------------------
+    kitLabel.setJustificationType (juce::Justification::centredLeft);
+    kitLabel.setColour (juce::Label::textColourId, theme::textDim);
+    kitLabel.setFont (theme::font (12.0f));
+    kitLabel.setInterceptsMouseClicks (false, false);
+    addAndMakeVisible (kitLabel);
 
-    saveKitButton.setTooltip ("Save everything currently dialled in - including velocity\n"
-                              "depths - as a kit of your own.");
-    saveKitButton.onClick = [this] { saveCurrentKitAs(); };
-    addAndMakeVisible (saveKitButton);
+    menuButton.setTooltip ("Kits, and the MIDI note map.");
+    menuButton.onClick = [this] { showMainMenu(); };
+    addAndMakeVisible (menuButton);
 
-    currentKitIndex = kit().getSelectedKit();
-    lastSeenKitParameter = currentKitIndex;
-    refreshKitButton();
-
-    // ---- Modulation mode ----------------------------------------------------
-    modButton.setClickingTogglesState (true);
-    modButton.setColour (juce::TextButton::buttonOnColourId, theme::velocityHard);
-    modButton.setTooltip ("Velocity modulation mode.\n"
-                          "Armed: drag any knob to set how far velocity sweeps that parameter.\n"
-                          "Disarmed: drag the rim of a knob to do the same, one knob at a time.");
-    modButton.onClick = [this]
+    // ---- Mode tabs -----------------------------------------------------------
+    for (int i = 0; i < (int) tabButtons.size(); ++i)
     {
-        uiState.modArmed.store (modButton.getToggleState());
-        repaint();
-    };
-    addAndMakeVisible (modButton);
+        auto& button = tabButtons[(size_t) i];
+        button.setButtonText (tabName ((EditorUiState::Mode) i));
+        button.setClickingTogglesState (false);
+        button.onClick = [this, i] { setMode ((EditorUiState::Mode) i); };
+        addAndMakeVisible (button);
+    }
 
+    // ---- Track rows ----------------------------------------------------------
     for (int t = 0; t < kNumTracks; ++t)
     {
         strips[(size_t) t] = std::make_unique<TrackStrip> (kit(), t, uiState);
-
-        // Right-clicking a pad is where a player looks for MIDI settings, so it offers the
-        // note map directly rather than only in the kit menu.
-        strips[(size_t) t]->onPadContextMenu = [this] { showNoteMapMenu(); };
         addAndMakeVisible (*strips[(size_t) t]);
     }
 
-    // Global controls carry no modulation target.
+    // ---- Global knobs --------------------------------------------------------
+    // No modulation target: there is no per-hit meaning to attach to the master or reverb.
     masterKnob = std::make_unique<ModelKnob> (kit(), -1, -1, uiState, pid::master);
     masterKnob->setDisplayName ("Master");
     masterKnob->setAccentColour (theme::accent);
@@ -66,16 +81,23 @@ DrumKitEditor::DrumKitEditor (DrumKitProcessor& owner)
 
     for (int i = 0; i < 4; ++i)
     {
-        reverbKnobs[(size_t) i] = std::make_unique<ModelKnob> (kit(), -1, -1, uiState, reverbIDs[i]);
-        reverbKnobs[(size_t) i]->setDisplayName (reverbNames[i]);
-        reverbKnobs[(size_t) i]->setAccentColour (juce::Colour (0xff7f8ea8));
-        reverbKnobs[(size_t) i]->setTooltip (reverbTips[i]);
-        addAndMakeVisible (*reverbKnobs[(size_t) i]);
+        auto& knob = reverbKnobs[(size_t) i];
+        knob = std::make_unique<ModelKnob> (kit(), -1, -1, uiState, reverbIDs[i]);
+        knob->setDisplayName (reverbNames[i]);
+        knob->setAccentColour (juce::Colour (0xff7f8ea8));
+        knob->setTooltip (reverbTips[i]);
+        addAndMakeVisible (*knob);
     }
 
+    currentKitIndex = kit().getSelectedKit();
+    lastSeenKitParameter = currentKitIndex;
+    refreshKitLabel();
+
+    setMode (EditorUiState::Mode::synth);
+
     setResizable (true, true);
-    setResizeLimits (1120, 660, 2400, 1500);
-    setSize (1280, 752);
+    setResizeLimits (1120, 720, 2400, 1500);
+    setSize (1360, 860);
 
     startTimerHz (30);
 }
@@ -86,190 +108,236 @@ DrumKitEditor::~DrumKitEditor()
     setLookAndFeel (nullptr);
 }
 
-void DrumKitEditor::paint (juce::Graphics& g)
+//==============================================================================
+void DrumKitEditor::setMode (EditorUiState::Mode mode)
 {
-    g.fillAll (theme::background);
+    uiState.mode.store (mode);
 
-    g.setColour (theme::panel);
-    g.fillRoundedRectangle (headerArea.toFloat().reduced (6.0f, 3.0f), 7.0f);
-
-    g.setColour (theme::outline);
-    g.drawRoundedRectangle (headerArea.toFloat().reduced (6.0f, 3.0f), 7.0f, 1.0f);
-
-    auto title = titleArea;
-
-    g.setColour (theme::accent);
-    g.setFont (theme::font (25.0f, juce::Font::bold));
-    g.drawText ("DRUMFORGE", title.removeFromTop (32), juce::Justification::centredLeft, false);
-
-    if (uiState.modArmed.load())
+    for (int i = 0; i < (int) tabButtons.size(); ++i)
     {
-        g.setColour (theme::velocityHard);
-        g.setFont (theme::font (11.0f, juce::Font::bold));
-        g.drawText ("VELOCITY MODULATION  -  drag a knob to set its depth, right-click to clear",
-                    title, juce::Justification::centredLeft, false);
-    }
-    else
-    {
-        g.setColour (theme::textDim);
-        g.setFont (theme::font (11.0f));
-        g.drawText ("8-track drum & percussion synthesiser  -  9 engines",
-                    title, juce::Justification::centredLeft, false);
+        auto& button = tabButtons[(size_t) i];
+        const bool active = (int) mode == i;
+
+        button.setToggleState (active, juce::dontSendNotification);
+        button.setColour (juce::TextButton::buttonColourId,
+                          active ? theme::accent : theme::panel);
+        button.setColour (juce::TextButton::textColourOffId,
+                          active ? theme::background : theme::textDim);
+        button.setColour (juce::TextButton::textColourOnId,
+                          active ? theme::background : theme::textDim);
     }
 
-    if (! kitCaptionArea.isEmpty())
-    {
-        g.setColour (theme::textDim);
-        g.setFont (theme::font (9.5f, juce::Font::bold));
-        g.drawText ("KIT", kitCaptionArea, juce::Justification::centredLeft, false);
-    }
+    updateContentVisibility();
+    resized();
+    repaint();
 }
 
+void DrumKitEditor::updateContentVisibility()
+{
+    const bool showTracks = uiState.mode.load() != EditorUiState::Mode::seq;
+
+    for (auto& strip : strips)
+        strip->setVisible (showTracks);
+}
+
+//==============================================================================
 void DrumKitEditor::resized()
 {
     auto area = getLocalBounds();
 
-    headerArea = area.removeFromTop (headerHeight);
+    // ---- Top bar -------------------------------------------------------------
+    topBarArea = area.removeFromTop (topBarHeight);
+    {
+        auto bar = topBarArea.reduced (16, 5);
 
-    auto header = headerArea.reduced (10, 4);
-    titleArea = header.removeFromLeft (330).reduced (8, 0);
+        titleArea = bar.removeFromLeft (juce::jmin (200, bar.getWidth() / 4));
 
-    auto kitSlot = header.removeFromLeft (juce::jmin (240, header.getWidth() / 3));
-    kitCaptionArea = kitSlot.removeFromTop (kitSlot.getHeight() / 2).reduced (2, 0);
+        menuButtonArea = bar.removeFromRight (56).withSizeKeepingCentre (56, 26);
+        menuButton.setBounds (menuButtonArea);
+        bar.removeFromRight (12);
 
-    auto kitRow = kitSlot.reduced (2, 2);
-    saveKitButton.setBounds (kitRow.removeFromRight (46));
-    kitRow.removeFromRight (4);
-    kitButton.setBounds (kitRow);
+        globalsArea = bar.removeFromRight (juce::jmin (380, bar.getWidth() / 2));
+        {
+            auto knobs = globalsArea;
+            const int width = knobs.getWidth() / 5;
 
-    modArea = header.removeFromLeft (66).reduced (6, 18);
-    modButton.setBounds (modArea);
+            masterKnob->setBounds (knobs.removeFromLeft (width));
 
-    auto knobsArea = header.removeFromRight (juce::jmin (500, header.getWidth()));
+            for (auto& knob : reverbKnobs)
+                knob->setBounds (knobs.removeFromLeft (width));
+        }
 
-    const int knobCount = 5;
-    const int knobWidth = knobsArea.getWidth() / knobCount;
+        kitLabelArea = bar.reduced (6, 0);
+        kitLabel.setBounds (kitLabelArea);
+    }
 
-    globalKnobArea = knobsArea;
+    // ---- Tab bar -------------------------------------------------------------
+    tabBarArea = area.removeFromTop (tabBarHeight);
+    {
+        auto tabs = tabBarArea.reduced (16, 4);
 
-    masterKnob->setBounds (knobsArea.removeFromLeft (knobWidth));
+        for (auto& button : tabButtons)
+            button.setBounds (tabs.removeFromLeft (94).reduced (2, 0));
 
-    for (auto& knob : reverbKnobs)
-        knob->setBounds (knobsArea.removeFromLeft (knobWidth));
+        hintArea = tabs.reduced (10, 0);
+    }
 
-    auto stripsArea = area.reduced (6, 5);
-    const int stripWidth = stripsArea.getWidth() / kNumTracks;
+    // ---- Content -------------------------------------------------------------
+    trackArea = area.reduced (10, 8);
+    seqArea = trackArea;
+
+    const int rowHeight = trackArea.getHeight() / kNumTracks;
 
     for (int t = 0; t < kNumTracks; ++t)
-        strips[(size_t) t]->setBounds (stripsArea.getX() + t * stripWidth,
-                                       stripsArea.getY(),
-                                       stripWidth,
-                                       stripsArea.getHeight());
+        strips[(size_t) t]->setBounds (trackArea.getX(),
+                                       trackArea.getY() + t * rowHeight,
+                                       trackArea.getWidth(),
+                                       rowHeight);
 }
 
-void DrumKitEditor::showKitMenu()
+void DrumKitEditor::paint (juce::Graphics& g)
+{
+    g.fillAll (theme::background);
+
+    // ---- Wordmark ------------------------------------------------------------
+    g.setColour (theme::accent);
+    g.setFont (theme::font (22.0f, juce::Font::bold));
+    g.drawText ("DRUMFORGE", titleArea, juce::Justification::centredLeft, false);
+
+    // ---- Tab bar rule and the mode hint --------------------------------------
+    g.setColour (theme::outline);
+    g.fillRect (tabBarArea.getX() + 16, tabBarArea.getBottom() - 1,
+                tabBarArea.getWidth() - 32, 1);
+
+    if (! hintArea.isEmpty() && uiState.mode.load() == EditorUiState::Mode::mod)
+    {
+        g.setColour (theme::velocityHard);
+        g.setFont (theme::font (11.0f, juce::Font::bold));
+        g.drawText ("Velocity modulation  -  drag any knob to set its depth",
+                    hintArea, juce::Justification::centredRight, false);
+    }
+
+    // ---- Sequencer placeholder ----------------------------------------------
+    if (uiState.mode.load() == EditorUiState::Mode::seq)
+    {
+        const auto panel = seqArea.toFloat();
+
+        g.setColour (theme::panel);
+        g.fillRoundedRectangle (panel, 6.0f);
+        g.setColour (theme::outline);
+        g.drawRoundedRectangle (panel, 6.0f, 1.0f);
+
+        auto text = seqArea.reduced (48);
+        const int textWidth = juce::jmin (640, text.getWidth());
+        text = text.withSizeKeepingCentre (textWidth, juce::jmin (text.getHeight(), 130));
+
+        g.setColour (theme::text);
+        g.setFont (theme::font (16.0f, juce::Font::bold));
+        g.drawText ("Sequencer", text.removeFromTop (26), juce::Justification::centred, false);
+
+        text.removeFromTop (8);
+
+        g.setColour (theme::textDim);
+        g.setFont (theme::font (12.0f));
+        g.drawFittedText ("One sequencer per track, each either a grid or a Euclidean pattern, "
+                          "with parameter automation lanes alongside. This page is scaffolding "
+                          "for that work; the instrument itself is fully playable from MIDI and "
+                          "the pads.",
+                          text, juce::Justification::centredTop, 5);
+    }
+}
+
+//==============================================================================
+void DrumKitEditor::showMainMenu()
 {
     juce::PopupMenu menu;
 
+    // ---- Kits ---------------------------------------------------------------
+    juce::PopupMenu kits;
     const int userStart = numFactoryKits();
 
-    menu.addSectionHeader ("Built-in");
     for (int i = 0; i < userStart; ++i)
-        menu.addItem (1000 + i, library.getName (i), true, i == currentKitIndex);
+        kits.addItem (menuKitBase + i, library.getName (i), true, i == currentKitIndex);
 
     if (library.getNumKits() > userStart)
     {
-        menu.addSectionHeader ("My kits");
+        kits.addSeparator();
+
         for (int i = userStart; i < library.getNumKits(); ++i)
-            menu.addItem (1000 + i, library.getName (i), true, i == currentKitIndex);
+            kits.addItem (menuKitBase + i, library.getName (i), true, i == currentKitIndex);
     }
 
-    menu.addSeparator();
-    menu.addItem (1, "Save current settings as a kit...");
-
-    juce::PopupMenu noteMaps;
-    for (int i = 0; i < kNumNoteMaps; ++i)
-        noteMaps.addItem (3000 + i, noteMapName ((NoteMap) i), true,
-                          (int) kit().getNoteMap() == i);
-
-    menu.addSubMenu ("MIDI note map", noteMaps);
+    kits.addSeparator();
+    kits.addItem (menuSaveKit, "Save current settings as a kit...");
+    kits.addItem (menuImportKit, "Import a kit file...");
+    kits.addItem (menuExportKit, "Export the current kit...");
 
     if (! library.isFactoryKit (currentKitIndex))
-    {
-        menu.addSeparator();
-        menu.addItem (3, "Delete \"" + library.getName (currentKitIndex) + "\"");
-    }
+        kits.addItem (menuDeleteKit, "Delete \"" + library.getName (currentKitIndex) + "\"");
 
-    menu.addItem (2, "Show kits folder");
+    kits.addItem (menuShowFolder, "Show kits folder");
 
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (kitButton),
-                        [this] (int result) { handleKitMenuResult (result); });
+    menu.addSubMenu ("Kit", kits);
+
+    // ---- Note map -----------------------------------------------------------
+    juce::PopupMenu maps;
+
+    for (int i = 0; i < kNumNoteMaps; ++i)
+        maps.addItem (menuNoteMapBase + i, noteMapName ((NoteMap) i), true,
+                      (int) kit().getNoteMap() == i);
+
+    menu.addSubMenu ("MIDI note map", maps);
+
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (menuButton),
+                        [this] (int result) { handleMainMenuResult (result); });
 }
 
-void DrumKitEditor::handleKitMenuResult (int result)
+void DrumKitEditor::handleMainMenuResult (int result)
 {
-    if (result >= 3000)
+    if (result >= menuNoteMapBase)
     {
-        kit().setNoteMap ((NoteMap) (result - 3000));
+        kit().setNoteMap ((NoteMap) (result - menuNoteMapBase));
         repaint();
         return;
     }
 
-    if (result >= 1000)
+    if (result >= menuKitBase)
     {
-        loadKit (result - 1000);
+        loadKit (result - menuKitBase);
         return;
     }
 
     switch (result)
     {
-        case 1:  saveCurrentKitAs();  break;
-        case 2:  library.getUserDirectory().createDirectory();
-                 library.getUserDirectory().revealToUser();
-                 break;
-        case 3:  deleteCurrentKit();  break;
+        case menuSaveKit:    saveCurrentKitAs();       break;
+        case menuImportKit:  importKitFromFile();      break;
+        case menuExportKit:  exportCurrentKitToFile(); break;
+        case menuDeleteKit:  deleteCurrentKit();       break;
+
+        case menuShowFolder:
+            library.getUserDirectory().createDirectory();
+            library.getUserDirectory().revealToUser();
+            break;
+
         default: break;
     }
 }
 
-void DrumKitEditor::showNoteMapMenu()
-{
-    juce::PopupMenu menu;
-
-    for (int i = 0; i < kNumNoteMaps; ++i)
-        menu.addItem (3000 + i, noteMapName ((NoteMap) i), true, (int) kit().getNoteMap() == i);
-
-    // At the cursor. The pad's parent strip is the full height of the window, so
-    // anchoring to it put the menu nowhere near the click.
-    menu.showMenuAsync (juce::PopupMenu::Options().withMousePosition(),
-                        [this] (int result)
-                        {
-                            if (result >= 3000)
-                            {
-                                kit().setNoteMap ((NoteMap) (result - 3000));
-                                repaint();
-                            }
-                        });
-}
-
+//==============================================================================
 void DrumKitEditor::loadKit (int index)
 {
     if (! juce::isPositiveAndBelow (index, library.getNumKits()))
         return;
 
+    // applyKitPreset keeps the host-facing kit parameter in step with the built-in kits;
+    // a user kit has no parameter to write, so it is applied directly.
     if (library.isFactoryKit (index))
-    {
         kit().applyKitPreset (index);
-        lastSeenKitParameter = index;
-    }
-    else
-    {
-        // A kit you saved is a complete snapshot, so every depth comes back with it.
-        applyKit (kit(), library.getKit (index));
-    }
+
+    applyKit (kit(), library.getKit (index));
 
     currentKitIndex = index;
-    refreshKitButton();
+    refreshKitLabel();
 }
 
 void DrumKitEditor::saveCurrentKitAs()
@@ -305,9 +373,79 @@ void DrumKitEditor::saveCurrentKitAs()
             }
 
             currentKitIndex = library.indexOfName (snapshot.name);
-            refreshKitButton();
+            refreshKitLabel();
         }),
         true);
+}
+
+void DrumKitEditor::importKitFromFile()
+{
+    auto chooser = std::make_shared<juce::FileChooser> (
+        "Import a kit",
+        juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+        "*" + KitLibrary::fileExtension());
+
+    chooser->launchAsync (juce::FileBrowserComponent::openMode
+                            | juce::FileBrowserComponent::canSelectFiles,
+        [this, chooser] (const juce::FileChooser& fc)
+        {
+            const auto file = fc.getResult();
+
+            if (! file.existsAsFile())
+                return;
+
+            auto xml = juce::XmlDocument::parse (file);
+
+            if (xml == nullptr)
+                return;
+
+            KitData imported;
+
+            if (! kitFromXml (*xml, imported))
+                return;
+
+            if (imported.name.isEmpty())
+                imported.name = file.getFileNameWithoutExtension();
+
+            applyKit (kit(), imported);
+
+            // Importing also adds it to the library, so it is there next time.
+            library.saveKit (imported);
+            currentKitIndex = library.indexOfName (imported.name);
+            refreshKitLabel();
+        });
+}
+
+void DrumKitEditor::exportCurrentKitToFile()
+{
+    const auto suggestedName = juce::isPositiveAndBelow (currentKitIndex, library.getNumKits())
+                                 ? library.getName (currentKitIndex)
+                                 : juce::String ("DrumForge Kit");
+
+    auto chooser = std::make_shared<juce::FileChooser> (
+        "Export the current kit",
+        juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+            .getChildFile (suggestedName + KitLibrary::fileExtension()),
+        "*" + KitLibrary::fileExtension());
+
+    chooser->launchAsync (juce::FileBrowserComponent::saveMode
+                            | juce::FileBrowserComponent::canSelectFiles
+                            | juce::FileBrowserComponent::warnAboutOverwriting,
+        [this, chooser] (const juce::FileChooser& fc)
+        {
+            auto file = fc.getResult();
+
+            if (file == juce::File())
+                return;
+
+            if (file.getFileExtension().isEmpty())
+                file = file.withFileExtension (KitLibrary::fileExtension());
+
+            const auto snapshot = captureKit (kit(), file.getFileNameWithoutExtension());
+
+            if (auto xml = kitToXml (snapshot))
+                xml->writeTo (file);
+        });
 }
 
 void DrumKitEditor::deleteCurrentKit()
@@ -317,18 +455,21 @@ void DrumKitEditor::deleteCurrentKit()
 
     library.deleteKit (currentKitIndex);
 
-    // The sound is still loaded, it just no longer corresponds to anything on disk.
+    // The sound is still loaded; it just no longer corresponds to anything on disk.
     currentKitIndex = -1;
-    refreshKitButton();
+    refreshKitLabel();
 }
 
-void DrumKitEditor::refreshKitButton()
+void DrumKitEditor::refreshKitLabel()
 {
-    kitButton.setButtonText (juce::isPositiveAndBelow (currentKitIndex, library.getNumKits())
-                               ? library.getName (currentKitIndex)
-                               : juce::String ("(unsaved)"));
+    const bool known = juce::isPositiveAndBelow (currentKitIndex, library.getNumKits());
+
+    kitLabel.setText (known ? "Kit:  " + library.getName (currentKitIndex)
+                            : juce::String ("Kit:  (unsaved)"),
+                      juce::dontSendNotification);
 }
 
+//==============================================================================
 void DrumKitEditor::timerCallback()
 {
     refreshFromProcessor();

@@ -83,7 +83,7 @@ bool VelocityKnob::isInRim (juce::Point<float> position) const
 
 bool VelocityKnob::shouldEditDepth (const juce::MouseEvent& event) const
 {
-    return isModulatable() && (uiState.modArmed.load() || isInRim (event.position));
+    return isModulatable() && (uiState.isModulationMode() || isInRim (event.position));
 }
 
 //==============================================================================
@@ -96,7 +96,7 @@ void VelocityKnob::paint (juce::Graphics& g)
 
     const auto fillColour = findColour (juce::Slider::rotarySliderFillColourId);
     const auto trackColour = findColour (juce::Slider::rotarySliderOutlineColourId);
-    const bool armed = uiState.modArmed.load();
+    const bool armed = uiState.isModulationMode();
 
     const float centre = getCentrePosition();
     const float depth = getDepth();

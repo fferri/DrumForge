@@ -69,12 +69,7 @@ void PadButton::paint (juce::Graphics& g)
 void PadButton::mouseDown (const juce::MouseEvent& event)
 {
     if (event.mods.isPopupMenu())
-    {
-        if (onContextMenu != nullptr)
-            onContextMenu();
-
-        return;
-    }
+        return;      // the settings that used to live here are in the main menu now
 
     pressed = true;
     glow = 1.0f;
@@ -196,11 +191,7 @@ TrackStrip::TrackStrip (DrumKitProcessor& owner, int index, EditorUiState& state
     noteLabel = juce::MidiMessage::getMidiNoteName (primaryNoteForTrack (trackIndex, displayedNoteMap), true, true, 3)
                   + "  " + juce::String (primaryNoteForTrack (trackIndex, displayedNoteMap));
 
-    pad.onContextMenu = [this]
-    {
-        if (onPadContextMenu != nullptr)
-            onPadContextMenu();
-    };
+
 
     displayedModel = processor.getSelectedModel (trackIndex);
     updateModelDependentUi();
@@ -319,47 +310,50 @@ void TrackStrip::layoutKnobGrid (juce::Rectangle<int> area, int columns, int row
 
 void TrackStrip::resized()
 {
-    auto area = getLocalBounds().reduced (4, 3);
+    auto area = getLocalBounds().reduced (6, 5);
 
-    headerArea = area.removeFromTop (22);
-    area.removeFromTop (3);
+    // Identity block: track number, engine name, note. Fixed width so every row lines up.
+    identityArea = area.removeFromLeft (juce::jmin (100, area.getWidth() / 8));
+
+    // Pad: square, as tall as the row allows.
+    const int padSize = juce::jmin (area.getWidth(), area.getHeight());
+    padArea = area.removeFromLeft (padSize).reduced (3, 0);
+    area.removeFromLeft (6);
+
+    // Engine and distortion, stacked in one column.
+    {
+        auto combos = area.removeFromLeft (juce::jmin (104, area.getWidth() / 4));
+        const int stackHeight = juce::jmin (combos.getHeight(), 2 * rowControlHeight + 5);
+        auto stack = combos.withSizeKeepingCentre (combos.getWidth(), stackHeight);
+
+        comboArea = stack.removeFromTop (rowControlHeight);
+        stack.removeFromTop (5);
+        distArea = stack.removeFromTop (rowControlHeight);
+    }
+    area.removeFromLeft (8);
+
+    // The right-hand controls are taken from the end, so the knobs absorb any slack.
+    randomiseButton.setBounds (area.removeFromRight (46)
+                                   .withSizeKeepingCentre (46, rowControlHeight));
+    area.removeFromRight (8);
 
     {
-        auto headerRow = headerArea;
-        headerButtonArea = headerRow.removeFromRight (40).reduced (1, 5);
-        randomiseButton.setBounds (headerButtonArea);
-        headerArea = headerRow;          // the header text lays out in what is left
+        const int buttonWidth = juce::jmin (62, juce::jmax (30, area.getWidth() / 5));
+        auto buttons = area.removeFromRight (buttonWidth)
+                           .withSizeKeepingCentre (buttonWidth, rowControlHeight);
+
+        muteButton.setBounds (buttons.removeFromLeft (buttons.getWidth() / 2).reduced (2, 0));
+        soloButton.setBounds (buttons.reduced (2, 0));
     }
+    area.removeFromRight (8);
 
-    padArea = area.removeFromTop (juce::jlimit (26, 50, area.getHeight() / 9));
-    area.removeFromTop (3);
+    meterArea = area.removeFromRight (8).reduced (0, 6);
 
-    meterArea = area.removeFromTop (4);
-    area.removeFromTop (5);
-
-    comboArea = area.removeFromTop (22);
-    area.removeFromTop (3);
-
-    distArea = area.removeFromTop (20);
-    area.removeFromTop (6);
-
-    const int remaining = area.getHeight();
-    macroArea = area.removeFromTop (remaining * 2 / 5);
-    utilArea = area;
-
-    layoutKnobGrid (macroArea, 2, 2, { decayKnob.get(), toneKnob.get(), characterKnob.get(), sweepKnob.get() });
-    layoutKnobGrid (utilArea, 2, 3, { tuneKnob.get(), levelKnob.get(), panKnob.get(), driveKnob.get(), sendKnob.get() });
-
-    // Mute and solo share the last free cell of the utility grid.
-    const int cellWidth = utilArea.getWidth() / 2;
-    const int cellHeight = utilArea.getHeight() / 3;
-
-    auto buttonCell = juce::Rectangle<int> (utilArea.getX() + cellWidth,
-                                            utilArea.getY() + 2 * cellHeight,
-                                            cellWidth, cellHeight).reduced (7, 9);
-
-    muteButton.setBounds (buttonCell.removeFromLeft (buttonCell.getWidth() / 2).reduced (2, 0));
-    soloButton.setBounds (buttonCell.reduced (2, 0));
+    knobArea = area;
+    layoutKnobGrid (knobArea, 9, 1,
+                    { decayKnob.get(), toneKnob.get(), characterKnob.get(), sweepKnob.get(),
+                      tuneKnob.get(), levelKnob.get(), panKnob.get(), driveKnob.get(),
+                      sendKnob.get() });
 
     modelBox.setBounds (comboArea);
     distBox.setBounds (distArea);
@@ -369,36 +363,39 @@ void TrackStrip::resized()
 void TrackStrip::paint (juce::Graphics& g)
 {
     const auto bounds = getLocalBounds().toFloat().reduced (1.0f);
-
-    const bool armed = uiState.modArmed.load();
+    const bool modulationMode = uiState.isModulationMode();
 
     g.setColour (theme::panel);
     g.fillRoundedRectangle (bounds, 6.0f);
 
-    // Unmistakable mode indicator: every strip goes hot while MOD is armed.
-    g.setColour (armed ? theme::velocityHard.withAlpha (0.8f) : theme::outline);
-    g.drawRoundedRectangle (bounds, 6.0f, armed ? 1.8f : 1.0f);
+    // Unmistakable mode indicator: every row goes hot on the modulation page.
+    g.setColour (modulationMode ? theme::velocityHard.withAlpha (0.8f) : theme::outline);
+    g.drawRoundedRectangle (bounds, 6.0f, modulationMode ? 1.8f : 1.0f);
 
     const int model = juce::jlimit (0, kNumModels - 1, displayedModel);
     const auto& info = getModelInfo (model);
-    const auto accent = juce::Colour (info.colour);
 
-    auto header = headerArea;
+    // ---- Identity ------------------------------------------------------------
+    {
+        auto identity = identityArea;
 
-    g.setColour (accent);
-    g.setFont (theme::font (11.0f, juce::Font::bold));
-    g.drawText (juce::String (trackIndex + 1), header.removeFromLeft (14),
-                juce::Justification::centredLeft, false);
+        g.setColour (juce::Colour (info.colour));
+        g.setFont (theme::font (13.0f, juce::Font::bold));
+        g.drawText (juce::String (trackIndex + 1), identity.removeFromTop (17),
+                    juce::Justification::centredLeft, false);
 
-    g.setColour (theme::text);
-    g.setFont (theme::font (10.5f, juce::Font::bold));
-    g.drawText (juce::String (info.name).toUpperCase(), header, juce::Justification::centredLeft, false);
+        g.setColour (theme::text);
+        g.setFont (theme::font (10.0f, juce::Font::bold));
+        g.drawText (juce::String (info.name).toUpperCase(), identity.removeFromTop (13),
+                    juce::Justification::centredLeft, false);
 
-    g.setColour (theme::textDim);
-    g.setFont (theme::font (9.5f));
-    g.drawText (noteLabel, header, juce::Justification::centredRight, false);
+        g.setColour (theme::textDim);
+        g.setFont (theme::font (9.0f));
+        g.drawText (noteLabel, identity.removeFromTop (12),
+                    juce::Justification::centredLeft, false);
+    }
 
-    // ---- Level meter --------------------------------------------------------
+    // ---- Level meter ---------------------------------------------------------
     if (! meterArea.isEmpty())
     {
         g.setColour (juce::Colour (0xff101317));
@@ -410,7 +407,8 @@ void TrackStrip::paint (juce::Graphics& g)
         if (normalised > 0.005f)
         {
             auto filled = meterArea.toFloat();
-            filled.setWidth (filled.getWidth() * normalised);
+            const float height = filled.getHeight() * normalised;
+            filled = filled.withTrimmedTop (filled.getHeight() - height);
 
             g.setColour (normalised > 0.86f ? theme::meterHot : theme::meter);
             g.fillRoundedRectangle (filled, 2.0f);

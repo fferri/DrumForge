@@ -303,9 +303,15 @@ whatever its author dialled in, so the concept is gone: a kit is a complete desc
 
 ## Note maps
 
-Two maps are supported, and they genuinely conflict — note 39 is a hand clap in General MIDI
-and the first pad on a BeatStep Pro. So it is a switch, not a union, and each map ignores the
-other's notes.
+Three maps are supported, and the first two genuinely conflict — note 39 is a hand clap in
+General MIDI and the first pad on a BeatStep Pro. So it is a switch, not a union, and each map
+ignores the others' notes.
+
+The third, **chromatic**, exists because a plain ascending run of eight notes is the only thing
+some controllers send. It is MIDI 60–67: "C3" is what the UI calls middle C, because note names
+are rendered with middle C in octave 3. That choice is a convention, not a fact — a DAW that
+calls middle C "C4" will show these notes an octave lower — so the README states the MIDI
+numbers alongside the names rather than relying on the label alone.
 
 The map is a **real parameter**, so it is saved with the session and visible to the host. Its
 *default* comes from a global preference file, so a one-time hardware choice applies to every
@@ -336,11 +342,43 @@ same normalised-space maths, so what is drawn cannot drift from what is heard. T
 coloured by *velocity* rather than by screen position, which is what makes a negative depth
 visibly reverse the gradient instead of merely sliding it.
 
+### Pages, and the main menu
+
+Three page tabs — SYNTH, MOD, SEQ — switch what the content area shows. The mode lives in
+`EditorUiState` as an atomic, not a parameter: it changes how a drag is interpreted and what
+is drawn, and nothing about it belongs to the sound. `VelocityKnob` and `ModelKnob` read it on
+every paint and mouse event, which is why it sits in the shared state object rather than being
+found by walking up the parent chain.
+
+Only SYNTH and MOD have content today. SEQ is deliberately a labelled placeholder rather than
+an empty panel: the page exists so the shape of the instrument is settled, and saying so is
+more honest than leaving a blank rectangle that looks broken.
+
+Everything that applies to the whole instrument moved into the main menu — a drawn hamburger
+button at the top right — rather than staying on the tracks:
+
+- **Kits**, with load, save, import, export and delete. Import and export go through a
+  `FileChooser` and really are file operations; import also adds the kit to your library.
+- **The MIDI note map.**
+
+The note map used to hang off a right-click on a track pad, on the reasoning that the pad is
+what responds to it. That was wrong once the map became one of three: it is a property of the
+whole instrument, and three tracks sharing a setting should not have it tucked behind one of
+them.
+
+The menu button is drawn rather than set as text, because the "hamburger" character is missing
+from some fonts and a tofu box would be worse than no icon. It is a `Button` subclass in
+`Theme.h`, which is also where the styling that used to live only on text buttons now applies.
+
 ### Layout constraints
 
-The editor allows 1120×660 up to 2400×1500. The knob cells are **width-limited, not
-height-limited**, which is why growing the track header to fit the `RND` button cost the
-knobs nothing.
+The editor allows 1120×720 up to 2400×1500. The eight tracks are **rows**, not columns, so the
+knobs are laid out across each row and absorb whatever width the fixed blocks do not use. That
+is why the row tolerates a narrow window: the identity block, pad, two selectors, mute/solo,
+meter and `RND` are fixed or square, and the nine knobs divide the remainder.
+
+Switching from columns to rows cost vertical space per track, so the minimum window height went
+from 660 to 720 to keep the knob captions legible.
 
 Smaller decisions, each of which was made for a reason:
 
@@ -487,7 +525,7 @@ Four tools, all of which exit non-zero on failure and run in CI. What each one c
 
 | Tool | Covers |
 |---|---|
-| `DrumForgeTests` (427 checks) | Everything headless: engines, level bounds, decay to true silence, sample rates, de-clicking, choke group, the velocity curve and its clamping, depth persistence, kit capture/restore, the randomiser's constraints, note maps, XML and filesystem round trips, the full host lifecycle |
+| `DrumForgeTests` (433 checks) | Everything headless: engines, level bounds, decay to true silence, sample rates, de-clicking, choke group, the velocity curve and its clamping, depth persistence, kit capture/restore, the randomiser's constraints, note maps, XML and filesystem round trips, the full host lifecycle |
 | `DrumForgeHostTest` (23 checks) | End-to-end through JUCE's real VST3 hosting code — the same path a DAW takes: bus layout, MIDI, parameter exposure, rendering, editor construction and painting, state save/restore, prepare/release cycles |
 | `DrumForgeScreenshot` | Editor layout and painting at four window sizes. The only way to check the band and dot actually draw |
 | `DrumForgeRender` | Writes WAVs for listening. Not an assertion, but the quickest way to hear a regression |
@@ -556,13 +594,14 @@ bug, which is why they are written down rather than left implicit.
     nine in ModTarget order, and only non-zero depths are serialised.
 14. **`FactoryKits.inc` is generated.** Edit `kits/*.dfkit` and re-run
     `scripts/emit_factory_kits.py`; never hand-edit the include.
-15. **The note map is one of two, never a union**, and is both a session parameter and a global
-    default preference.
+15. **The note map is exactly one of the three, never a union**, and is both a session parameter
+    and a global default preference.
 
 ### UI and build
 
 16. **Note captions refresh on the editor's timer, never in a constructor** — the map can change
-    while the editor is open.
+    while the editor is open. Switching page must not disturb them either: the note follows the
+    map, not the page.
 17. **The kit parameter is polled rather than attached**, so restoring a session does not
     re-apply the preset over the restored values.
 18. **Anything constructing a processor must call `setSettingsDirectoryOverride` first**, before

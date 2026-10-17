@@ -30,7 +30,7 @@ ModelKnob::ModelKnob (DrumKitProcessor& processor,
     attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         processor.apvts, parameterID, knob);
 
-    displayedArmed = uiState.modArmed.load();
+    displayedArmed = uiState.isModulationMode();
 
     addAndMakeVisible (knob);
 }
@@ -53,7 +53,7 @@ void ModelKnob::setAccentColour (juce::Colour newAccent)
 void ModelKnob::refreshFromProcessor()
 {
     // The readout switches meaning with the mode, so it has to be redrawn on the change.
-    if (const bool armed = uiState.modArmed.load(); armed != displayedArmed)
+    if (const bool armed = uiState.isModulationMode(); armed != displayedArmed)
     {
         displayedArmed = armed;
         repaint();
@@ -75,7 +75,7 @@ void ModelKnob::resized()
 
 void ModelKnob::paint (juce::Graphics& g)
 {
-    const bool armed = uiState.modArmed.load();
+    const bool armed = uiState.isModulationMode();
 
     g.setColour (armed ? theme::velocityHard.withAlpha (0.75f) : theme::textDim);
     g.setFont (theme::font (juce::jlimit (8.0f, 10.5f, (float) nameArea.getHeight() * 0.82f)));
@@ -88,8 +88,8 @@ void ModelKnob::paint (juce::Graphics& g)
 
 juce::String ModelKnob::formatValue()
 {
-    // While MOD is armed the knob edits and shows the depth, not the parameter value.
-    if (uiState.modArmed.load())
+    // On the MOD page the knob edits and shows the depth, not the parameter value.
+    if (uiState.isModulationMode())
     {
         const float depth = knob.getDepth();
 

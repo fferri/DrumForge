@@ -110,16 +110,21 @@ int defaultModelForTrack (int trackIndex) noexcept;
     and the first pad on a BeatStep - so this is a choice between them rather than a union
     of both.
 
+    **Chromatic** is the escape hatch for anything that sends a plain ascending run: eight
+    consecutive notes starting at middle C. It is deliberately last in the list so the two
+    named maps stay adjacent.
+
     The map is a property of the hardware in front of you, not of the song, so it is stored
     as a global preference rather than in the session.
 */
 enum class NoteMap
 {
     generalMidi = 0,
-    beatStepPro
+    beatStepPro,
+    chromatic
 };
 
-constexpr int kNumNoteMaps = 2;
+constexpr int kNumNoteMaps = 3;
 
 /** Human-readable name, for the menus. */
 const char* noteMapName (NoteMap map) noexcept;

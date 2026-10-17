@@ -57,9 +57,30 @@ namespace
         { 83, { 83 } }
     };
 
+    // Eight consecutive notes from middle C. "C3" here means MIDI 60, which is what the UI
+    // calls it (note names are rendered with middle C as octave 3).
+    const NoteMapping chromaticMappings[kNumTracks]
+    {
+        { 60, { 60 } },
+        { 61, { 61 } },
+        { 62, { 62 } },
+        { 63, { 63 } },
+        { 64, { 64 } },
+        { 65, { 65 } },
+        { 66, { 66 } },
+        { 67, { 67 } }
+    };
+
     const NoteMapping* mappingsFor (NoteMap map) noexcept
     {
-        return map == NoteMap::beatStepPro ? beatStepProMappings : generalMidiMappings;
+        switch (map)
+        {
+            case NoteMap::beatStepPro: return beatStepProMappings;
+            case NoteMap::chromatic:   return chromaticMappings;
+            case NoteMap::generalMidi: break;
+        }
+
+        return generalMidiMappings;
     }
 
     //==========================================================================
@@ -134,6 +155,7 @@ const char* noteMapName (NoteMap map) noexcept
     {
         case NoteMap::generalMidi: return "General MIDI";
         case NoteMap::beatStepPro: return "BeatStep Pro";
+        case NoteMap::chromatic:   return "Chromatic from C3";
     }
 
     return "?";

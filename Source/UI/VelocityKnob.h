@@ -20,7 +20,7 @@ namespace df
       double-click    -> reset the value, or the depth when aimed at the rim
       right-click     -> reset / clear modulation
 
-    With MOD armed the whole knob edits depth instead of value, so the target is large and
+    On the MOD page the whole knob edits depth instead of value, so the target is large and
     obvious and the numeric readout switches to showing the depth.
 */
 class VelocityKnob final : public juce::Slider
@@ -33,7 +33,7 @@ public:
 
     void setAccentColour (juce::Colour newAccent);
 
-    /** Called from the strip's timer. Repaints only when the drawn dot actually moved. */
+    /** Called from the row's timer. Repaints only when the drawn dot actually moved. */
     void refreshFromProcessor();
 
     float getDepth() const;

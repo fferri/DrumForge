@@ -1491,8 +1491,22 @@ void testNoteMapOptions()
              && trackForMidiNote (51, NoteMap::beatStepPro) == 2,
            "note 51 is the ride under GM but a hat on a BeatStep");
 
+    // ---- chromatic ----
+    bool chromaticMatches = true;
+
+    for (int t = 0; t < kNumTracks; ++t)
+        chromaticMatches = chromaticMatches
+                            && primaryNoteForTrack (t, NoteMap::chromatic) == 60 + t
+                            && trackForMidiNote (60 + t, NoteMap::chromatic) == t;
+
+    check (chromaticMatches, "the chromatic map is eight consecutive notes from middle C",
+           juce::String (primaryNoteForTrack (0, NoteMap::chromatic)) + ".."
+             + juce::String (primaryNoteForTrack (7, NoteMap::chromatic)));
+
     check (trackForMidiNote (36, NoteMap::beatStepPro) == -1,
            "the GM kick note does nothing once the BeatStep map is selected");
+    check (trackForMidiNote (36, NoteMap::chromatic) == -1,
+           "and nothing under the chromatic map either");
     check (trackForMidiNote (83, NoteMap::generalMidi) == -1,
            "and the BeatStep's last pad does nothing under GM");
 
@@ -1613,6 +1627,21 @@ void testEditorNoteLabels()
 
     check (reopened.getTrackNoteLabel (7).contains ("83"),
            "an editor opened later starts on the right note", reopened.getTrackNoteLabel (7));
+
+    // ---- pages ----
+    // Switching page must not disturb the header: the note follows the map, not the page.
+    const auto labelBeforePageSwitch = editor.getTrackNoteLabel (0);
+
+    editor.setMode (EditorUiState::Mode::mod);
+    check (editor.getMode() == EditorUiState::Mode::mod, "the editor switches to the modulation page");
+    check (editor.getTrackNoteLabel (0) == labelBeforePageSwitch,
+           "and the track header still shows the same note there", editor.getTrackNoteLabel (0));
+
+    editor.setMode (EditorUiState::Mode::seq);
+    check (editor.getMode() == EditorUiState::Mode::seq, "and to the sequencer page");
+
+    editor.setMode (EditorUiState::Mode::synth);
+    check (editor.getMode() == EditorUiState::Mode::synth, "and back to the synth page");
 
     processor.setNoteMap (NoteMap::generalMidi);
 }

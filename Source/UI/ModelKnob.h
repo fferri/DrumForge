@@ -32,7 +32,7 @@ public:
     void setDisplayName (juce::String newName);
     void setAccentColour (juce::Colour newAccent);
 
-    /** Called from the strip's timer. */
+    /** Called from the row's timer. */
     void refreshFromProcessor();
 
     void resized() override;

@@ -31,6 +31,41 @@ inline juce::Font font (float height, int styleFlags = juce::Font::plain)
 namespace df
 {
 
+/** The main-menu button: three lines on a small panel.
+
+    Drawn rather than set as text, because a "hamburger" character is not present in every
+    font on every platform, and a tofu box would be worse than no icon at all.
+*/
+class MenuButton final : public juce::Button
+{
+public:
+    MenuButton() : juce::Button ("Menu") {}
+
+    void paintButton (juce::Graphics& g, bool highlighted, bool down) override
+    {
+        const auto bounds = getLocalBounds().toFloat().reduced (1.0f);
+
+        g.setColour (down ? theme::accent.withAlpha (0.85f)
+                          : (highlighted ? theme::panelAlt.brighter (0.18f) : theme::panelAlt));
+        g.fillRoundedRectangle (bounds, 4.0f);
+
+        g.setColour (theme::outline);
+        g.drawRoundedRectangle (bounds, 4.0f, 1.0f);
+
+        const auto centre = bounds.getCentre();
+        const float width = juce::jmax (12.0f, bounds.getWidth() * 0.42f);
+        const float thickness = 1.8f;
+        const float spacing = 5.0f;
+
+        g.setColour (down ? theme::background : theme::text);
+
+        for (int i = -1; i <= 1; ++i)
+            g.fillRoundedRectangle (centre.x - width * 0.5f,
+                                    centre.y + (float) i * spacing - thickness * 0.5f,
+                                    width, thickness, thickness * 0.5f);
+    }
+};
+
 /** Dark drum-machine styling for everything except the rotary knobs.
 
     The knobs deliberately do not use this: they carry per-parameter velocity modulation

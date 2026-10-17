@@ -69,11 +69,17 @@ If you would rather build it yourself, see [AGENTS.md](AGENTS.md#building).
 
 ### The window
 
-Eight track strips side by side, with a bar across the top holding the kit selector, the
-global `Master` level, and the shared reverb (`Size`, `Damp`, `Mix`, `Width`).
+A bar across the top holds the wordmark, the name of the kit currently loaded, the global
+`Master` level, the shared reverb (`Size`, `Damp`, `Mix`, `Width`), and the menu button at
+the far right.
 
-Each track strip, top to bottom:
+Under it are three page tabs — **SYNTH**, **MOD** and **SEQ** — and then the eight tracks,
+one to a row.
 
+Each track row, left to right:
+
+- **Track number and note** — the track's number, its engine, and the MIDI note that
+  triggers it.
 - **Pad** — click to audition. The click's vertical position sets the velocity, soft at the
   top and hard at the bottom. The pad lights up on MIDI hits too.
 - **Engine selector** — swaps the synthesis engine, loading that engine's own defaults so
@@ -81,11 +87,23 @@ Each track strip, top to bottom:
 - **Distortion curve** — the saturation shape applied by the Drive knob.
 - **Four macro knobs** — `Decay`, `Tone`, `Character`, `Sweep`. Each one means something
   specific to the engine, and the captions change to match.
-- **Per-track controls** — `Tune`, `Level`, `Pan`, `Drive`, `Send`.
+- **Five per-track knobs** — `Tune`, `Level`, `Pan`, `Drive`, `Send`.
+- **`M` / `S`** — mute and solo, with a level meter beside them.
 - **`RND`** — rolls new settings for that machine.
-- **M / S** — mute and solo, with a level meter above them.
 
 Double-click any knob to return it to its default.
+
+### The pages
+
+**SYNTH** is where you shape the sound, and where the plugin opens.
+
+**MOD** is where you set how far velocity moves each knob. On this page a drag anywhere on a
+knob edits its depth rather than its value — the same thing the rim drag does on the SYNTH
+page, but with a far larger target. Every row goes hot while you are there, so the mode is
+never ambiguous.
+
+**SEQ** will hold the sequencers. It is scaffolding today: the page exists so the shape of the
+instrument is settled, but the instrument is fully playable from MIDI and the pads.
 
 ### The engines
 
@@ -160,12 +178,13 @@ is coloured by velocity rather than by screen position — so a negative depth v
 | Gesture | Effect |
 |---|---|
 | Drag the **rim** of a knob | sets that knob's velocity depth |
-| Arm **MOD** in the header, then drag anywhere on a knob | the same, with a much larger target |
+| Switch to the **MOD** tab, then drag anywhere on a knob | the same, with a much larger target |
 | Double-click the rim | resets that depth to 0 |
 | Right-click a knob | reset, clear this track, or clear every track |
 
-Arming MOD tints every strip and switches the numeric readouts over to the depth, so there
-is no mistaking which mode you are in.
+The MOD page tints every row and switches the numeric readouts over to the depth, so there
+is no mistaking which page you are on. The bands themselves are drawn on every page, so you
+can see a knob's velocity range while you set its value.
 
 ### `RND`
 
@@ -198,12 +217,17 @@ Twenty-five kits ship with it:
 
 alongside three originals: **Industrial** (the default), **Warehouse** and **Studio**.
 
-Click the kit name to browse. Built-in kits and your own appear in one list.
+Open the main menu — the button at the top right — and choose **Kit**. Built-in kits and
+your own appear in one list.
 
 **Built-in kits are read-only and are not copied to disk**, so a later version of DrumForge
 can improve them and you get the improvement automatically. Saving always makes a kit of
 your own: with a built-in kit loaded, Save pre-fills "<name> Copy", so turning a factory kit
 into an editable one is one click.
+
+**Save current settings as a kit...** snapshots everything dialled in. **Import a kit
+file...** loads a `.dfkit` from anywhere on disk and adds it to your library. **Export the
+current kit...** writes one out.
 
 Your own kits are individual files, so they survive updates, can be backed up and can be
 handed to someone else:
@@ -240,8 +264,8 @@ An Arturia BeatStep Pro's drum sequencer does not send GM notes. Its pads send
 `39, 37, 51, 52, 60, 66, 58, 83`, which is a different language — and one that *collides*
 with GM, since note 39 is a hand clap in General MIDI and the first pad on a BeatStep.
 
-So this is a switch, not a union. Right-click any pad, or use the menu behind the kit name,
-and choose **MIDI note map → BeatStep Pro**:
+So this is a switch, not a union. Open the main menu and choose **MIDI note map → BeatStep
+Pro**:
 
 | Track | GM | BeatStep Pro |
 |---|---|---|
@@ -254,8 +278,14 @@ and choose **MIDI note map → BeatStep Pro**:
 | 7 | 49 | 58 |
 | 8 | 51 | 83 |
 
-Each map ignores the other's notes, so note 36 does nothing while the BeatStep map is
-selected. The note number shown in each track's header follows the choice.
+Each map ignores the others' notes, so note 36 does nothing while the BeatStep map is
+selected. The note number shown in each track's row follows the choice.
+
+#### Other controllers
+
+If your controller just sends an ascending run of eight notes, choose **Chromatic from C3**.
+Track 1 is the note the plugin calls C3 — MIDI 60 — and the eight tracks are the eight notes
+above it, 60 to 67, with no aliases.
 
 The map is saved with your session, and a new instance starts on whichever map you chose
 last.
