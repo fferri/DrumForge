@@ -1645,6 +1645,16 @@ void testSequencerCore()
         check (plain != shifted, "and the rotation actually changes where the hits land");
     }
 
+    {
+        const TriggerLane fresh;
+        bool anyStepOn = false;
+
+        for (int i = 0; i < kMaxLaneSteps; ++i)
+            anyStepOn = anyStepOn || fresh.steps[(size_t) i];
+
+        check (! anyStepOn, "a new grid lane starts empty, not with a starter pattern");
+    }
+
     check (! TriggerLane().enabled, "a new trigger lane starts disabled");
     check (TriggerLane().speed == LaneSpeed::xOne, "and its speed defaults to x1");
 

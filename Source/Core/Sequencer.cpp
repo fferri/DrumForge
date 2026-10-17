@@ -87,9 +87,9 @@ void TriggerLane::setDefaultsFor (TriggerMode newMode) noexcept
 
     if (newMode == TriggerMode::grid)
     {
-        // Four on the floor, so a new lane is immediately audible and obviously alive.
-        for (int i = 0; i < kMaxLaneSteps; ++i)
-            steps[(size_t) i] = (i % 4) == 0;
+        // Empty rather than a starter pattern: a lane that plays something you did not ask
+        // for is harder to reason about than one that is obviously silent.
+        steps.fill (false);
     }
     else
     {

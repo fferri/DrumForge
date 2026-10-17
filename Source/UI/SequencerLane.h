@@ -112,6 +112,7 @@ private:
     const AutomationLane& lane() const noexcept;
 
     void syncControls();
+    juce::Rectangle<int> envelopeBounds() const noexcept;
     int findPointAt (juce::Point<int>) const noexcept;
 
     DrumKitProcessor& processor;

@@ -462,23 +462,31 @@ void AutomationLaneComponent::resized()
     editorBounds = area.withTrimmedRight (10);
 }
 
+juce::Rectangle<int> AutomationLaneComponent::envelopeBounds() const noexcept
+{
+    // Inset, so a point at position 0 or 1 or at value -1 or +1 is drawn wholly inside the
+    // component. They used to sit centred on the boundary, and Component::contains() excludes
+    // the right and bottom edges, which made the first and last points impossible to grab.
+    return editorBounds.reduced (5);
+}
+
 int AutomationLaneComponent::findPointAt (juce::Point<int> position) const noexcept
 {
     const auto& current = lane();
+    const auto area = envelopeBounds();
 
-    if (current.numPoints <= 0 || editorBounds.isEmpty())
+    if (current.numPoints <= 0 || area.isEmpty())
         return -1;
 
     int best = -1;
-    int bestDistance = 12;
+    int bestDistance = 14;
 
     for (int i = 0; i < current.numPoints; ++i)
     {
         const auto& point = current.points[(size_t) i];
-        const int x = editorBounds.getX()
-                        + juce::roundToInt (point.position * (float) editorBounds.getWidth());
-        const int y = editorBounds.getCentreY()
-                        - juce::roundToInt (point.value * (float) editorBounds.getHeight() * 0.5f);
+        const int x = area.getX() + juce::roundToInt (point.position * (float) area.getWidth());
+        const int y = area.getCentreY()
+                        - juce::roundToInt (point.value * (float) area.getHeight() * 0.5f);
 
         const int distance = juce::jmax (std::abs (x - position.x), std::abs (y - position.y));
 
@@ -496,6 +504,8 @@ void AutomationLaneComponent::mouseDown (const juce::MouseEvent& event)
 {
     auto& current = lane();
 
+    const auto area = envelopeBounds();
+
     if (! editorBounds.contains (event.getPosition()))
         return;
 
@@ -504,10 +514,10 @@ void AutomationLaneComponent::mouseDown (const juce::MouseEvent& event)
     if (draggedPoint < 0 && current.numPoints < kMaxModPoints)
     {
         const float position = juce::jlimit (0.0f, 1.0f,
-            (float) (event.x - editorBounds.getX()) / (float) juce::jmax (1, editorBounds.getWidth()));
+            (float) (event.x - area.getX()) / (float) juce::jmax (1, area.getWidth()));
         const float value = juce::jlimit (-1.0f, 1.0f,
-            -((float) (event.y - editorBounds.getCentreY())
-                / (float) juce::jmax (1, editorBounds.getHeight()) * 2.0f));
+            -((float) (event.y - area.getCentreY())
+                / (float) juce::jmax (1, area.getHeight()) * 2.0f));
 
         int insertAt = current.numPoints;
 
@@ -540,19 +550,22 @@ void AutomationLaneComponent::mouseDrag (const juce::MouseEvent& event)
 
     // Clamp between the neighbours so the points stay ordered; re-sorting mid-drag would
     // swap the point out from under the pointer.
+    const auto area = envelopeBounds();
     const float lower = draggedPoint > 0 ? current.points[(size_t) (draggedPoint - 1)].position : 0.0f;
     const float upper = draggedPoint < current.numPoints - 1
                           ? current.points[(size_t) (draggedPoint + 1)].position
                           : 1.0f;
 
     current.points[(size_t) draggedPoint].position = juce::jlimit (lower, upper,
-        (float) (event.x - editorBounds.getX()) / (float) juce::jmax (1, editorBounds.getWidth()));
+        (float) (event.x - area.getX()) / (float) juce::jmax (1, area.getWidth()));
 
     current.points[(size_t) draggedPoint].value = juce::jlimit (-1.0f, 1.0f,
-        -((float) (event.y - editorBounds.getCentreY())
-            / (float) juce::jmax (1, editorBounds.getHeight()) * 2.0f));
+        -((float) (event.y - area.getCentreY())
+            / (float) juce::jmax (1, area.getHeight()) * 2.0f));
 
-    repaint (editorBounds);
+    // The whole component, not just the envelope: a dot at the edge used to leave a stale
+    // half drawn outside the repainted region.
+    repaint();
 }
 
 void AutomationLaneComponent::mouseUp (const juce::MouseEvent&)
@@ -590,10 +603,9 @@ void AutomationLaneComponent::paint (juce::Graphics& g)
         return;
 
     const auto& current = lane();
-    const auto area = editorBounds.toFloat();
 
     g.setColour (juce::Colour (0xff101317));
-    g.fillRoundedRectangle (area, 3.0f);
+    g.fillRoundedRectangle (editorBounds.toFloat(), 3.0f);
 
     if (! current.enabled)
     {
@@ -602,6 +614,8 @@ void AutomationLaneComponent::paint (juce::Graphics& g)
         g.drawText ("off", editorBounds, juce::Justification::centred, false);
         return;
     }
+
+    const auto area = envelopeBounds().toFloat();
 
     g.setColour (theme::outline);
     g.fillRect (area.getX(), area.getCentreY() - 0.5f, area.getWidth(), 1.0f);
