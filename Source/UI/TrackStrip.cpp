@@ -199,29 +199,26 @@ void TrackStrip::resized()
 {
     auto area = getLocalBounds().reduced (6, 5);
 
-    // Identity block: track number, engine name, note. Fixed width so every row lines up.
     // Identity and pad together, so every page shows the same block in the same place.
     const int headerWidth = TrackHeader::identityWidth
                               + juce::jmin (area.getHeight(), area.getWidth() / 4);
     headerArea = area.removeFromLeft (headerWidth);
     area.removeFromLeft (6);
 
-    // Engine and distortion, stacked in one column.
+    // Engine, distortion, then RND underneath them: the button rolls the machine these two
+    // select, so it belongs in that column rather than out at the end of the row.
     {
         auto combos = area.removeFromLeft (juce::jmin (104, area.getWidth() / 4));
-        const int stackHeight = juce::jmin (combos.getHeight(), 2 * rowControlHeight + 5);
-        auto stack = combos.withSizeKeepingCentre (combos.getWidth(), stackHeight);
+        const int cell = juce::jmin (22, (combos.getHeight() - 8) / 3);
+        auto stack = combos.withSizeKeepingCentre (combos.getWidth(), 3 * cell + 8);
 
-        comboArea = stack.removeFromTop (rowControlHeight);
-        stack.removeFromTop (5);
-        distArea = stack.removeFromTop (rowControlHeight);
+        comboArea = stack.removeFromTop (cell);
+        stack.removeFromTop (4);
+        distArea = stack.removeFromTop (cell);
+        stack.removeFromTop (4);
+        randomiseButton.setBounds (stack.removeFromTop (cell));
     }
     area.removeFromLeft (8);
-
-    // The right-hand controls are taken from the end, so the knobs absorb any slack.
-    randomiseButton.setBounds (area.removeFromRight (46)
-                                   .withSizeKeepingCentre (46, rowControlHeight));
-    area.removeFromRight (8);
 
     {
         const int buttonWidth = juce::jmin (62, juce::jmax (30, area.getWidth() / 5));
@@ -257,9 +254,6 @@ void TrackStrip::paint (juce::Graphics& g)
     // Unmistakable mode indicator: every row goes hot on the modulation page.
     g.setColour (modulationMode ? theme::velocityHard.withAlpha (0.8f) : theme::outline);
     g.drawRoundedRectangle (bounds, 6.0f, modulationMode ? 1.8f : 1.0f);
-
-    const int model = juce::jlimit (0, kNumModels - 1, displayedModel);
-    const auto& info = getModelInfo (model);
 
     // ---- Level meter ---------------------------------------------------------
     if (! meterArea.isEmpty())

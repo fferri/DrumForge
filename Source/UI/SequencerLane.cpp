@@ -69,9 +69,13 @@ void ValueStepper::paint (juce::Graphics& g)
     g.drawText (caption, area.removeFromLeft (38).reduced (5, 0),
                 juce::Justification::centredLeft, false);
 
+    // The two buttons are children drawn on top, so their width has to come out of the area
+    // the number is centred in. Otherwise a three-digit count runs underneath them.
+    area.removeFromRight (2 * 18);
+
     g.setColour (theme::text);
     g.setFont (theme::font (11.0f, juce::Font::bold));
-    g.drawText (juce::String (value), area.reduced (2, 0), juce::Justification::centred, false);
+    g.drawText (juce::String (value), area, juce::Justification::centred, false);
 }
 
 //==============================================================================
@@ -402,7 +406,7 @@ AutomationLaneComponent::AutomationLaneComponent (DrumKitProcessor& owner, int i
         speedBox.addItem (laneSpeedName ((LaneSpeed) i), i + 1);
 
     amountSlider.setSliderStyle (juce::Slider::LinearBar);
-    amountSlider.setTextBoxStyle (juce::Slider::TextBoxAbove, false, 56, 14);
+    amountSlider.setTextBoxStyle (juce::Slider::TextBoxAbove, false, 56, 13);
     amountSlider.setRange (0.0, 100.0, 1.0);
     amountSlider.setTooltip ("How far the envelope moves the parameter.");
     amountSlider.addListener (this);
@@ -488,10 +492,10 @@ void AutomationLaneComponent::resized()
 {
     auto area = getLocalBounds().reduced (8, 4);
 
-    // The parameter tabs run the full width, so all nine are readable at once and it is
-    // obvious which parameters are being automated.
-    tabArea = area.removeFromTop (16);
-    area.removeFromTop (2);
+    // Reserve the strip's height here; its width is set at the end, once the envelope's
+    // column is known.
+    const int rowTop = area.getY();
+    area.removeFromTop (tabHeight + 2);
 
     headerArea = area.removeFromLeft (TrackHeader::identityWidth
                                         + juce::jmin (area.getHeight(), area.getWidth() / 5));
@@ -512,9 +516,18 @@ void AutomationLaneComponent::resized()
 
     area.removeFromLeft (10);
 
-    amountSlider.setBounds (area.removeFromRight (110).withSizeKeepingCentre (110, 20));
+    // The slider's own readout says 50, which means nothing without a caption; the caption
+    // sits in the strip above it.
+    auto amountArea = area.removeFromRight (110);
+    amountLabelArea = amountArea.removeFromTop (13).withTrimmedLeft (2);
+    amountSlider.setBounds (amountArea.removeFromTop (juce::jmin (32, amountArea.getHeight())));
 
     editorBounds = area.withTrimmedRight (10);
+
+    // The tabs line up with the envelope, not with the whole row, so the two read as one
+    // column instead of a bar that happens to be above it.
+    tabArea = juce::Rectangle<int> (editorBounds.getX(), rowTop,
+                                    editorBounds.getWidth(), tabHeight);
 }
 
 juce::Rectangle<int> AutomationLaneComponent::envelopeBounds() const noexcept
@@ -676,6 +689,10 @@ void AutomationLaneComponent::paint (juce::Graphics& g)
 
     if (editorBounds.isEmpty())
         return;
+
+    g.setColour (theme::textDim);
+    g.setFont (theme::font (9.0f));
+    g.drawText ("Amount", amountLabelArea, juce::Justification::centredLeft, false);
 
     const auto& current = lane();
 

@@ -139,7 +139,9 @@ private:
     juce::Slider amountSlider;
 
     TrackHeader header;
-    juce::Rectangle<int> tabArea, headerArea, controlsArea, editorBounds;
+    juce::Rectangle<int> tabArea, headerArea, controlsArea, editorBounds, amountLabelArea;
+
+    static constexpr int tabHeight = 16;
 
     int draggedPoint = -1;
 
