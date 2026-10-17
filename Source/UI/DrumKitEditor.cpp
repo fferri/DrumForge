@@ -12,6 +12,7 @@ namespace
             case EditorUiState::Mode::synth: return "SYNTH";
             case EditorUiState::Mode::mod:   return "MOD";
             case EditorUiState::Mode::seq:   return "SEQ";
+            case EditorUiState::Mode::fx:    return "FX";
         }
 
         return "";
@@ -134,10 +135,17 @@ void DrumKitEditor::setMode (EditorUiState::Mode mode)
 
 void DrumKitEditor::updateContentVisibility()
 {
-    const bool showTracks = uiState.mode.load() != EditorUiState::Mode::seq;
+    const auto mode = uiState.mode.load();
+    const bool showTracks = mode == EditorUiState::Mode::synth
+                              || mode == EditorUiState::Mode::mod;
 
     for (auto& strip : strips)
         strip->setVisible (showTracks);
+
+    for (auto& knob : reverbKnobs)
+        knob->setVisible (mode == EditorUiState::Mode::fx);
+
+    masterKnob->setVisible (true);
 }
 
 //==============================================================================
@@ -156,16 +164,9 @@ void DrumKitEditor::resized()
         menuButton.setBounds (menuButtonArea);
         bar.removeFromRight (12);
 
-        globalsArea = bar.removeFromRight (juce::jmin (380, bar.getWidth() / 2));
-        {
-            auto knobs = globalsArea;
-            const int width = knobs.getWidth() / 5;
-
-            masterKnob->setBounds (knobs.removeFromLeft (width));
-
-            for (auto& knob : reverbKnobs)
-                knob->setBounds (knobs.removeFromLeft (width));
-        }
+        // Only the master lives up here now; the reverb moved to its own page.
+        globalsArea = bar.removeFromRight (juce::jmin (96, bar.getWidth() / 4));
+        masterKnob->setBounds (globalsArea);
 
         kitLabelArea = bar.reduced (6, 0);
         kitLabel.setBounds (kitLabelArea);
@@ -185,6 +186,16 @@ void DrumKitEditor::resized()
     // ---- Content -------------------------------------------------------------
     trackArea = area.reduced (10, 8);
     seqArea = trackArea;
+    fxArea = trackArea;
+
+    {
+        auto row = fxArea.reduced (40, 46);
+        const int cellWidth = juce::jmin (180, juce::jmax (80, row.getWidth() / 5));
+        auto cells = row.withSizeKeepingCentre (cellWidth * 4, juce::jmin (row.getHeight(), 190));
+
+        for (auto& knob : reverbKnobs)
+            knob->setBounds (cells.removeFromLeft (cellWidth));
+    }
 
     const int rowHeight = trackArea.getHeight() / kNumTracks;
 
@@ -215,6 +226,28 @@ void DrumKitEditor::paint (juce::Graphics& g)
         g.setFont (theme::font (11.0f, juce::Font::bold));
         g.drawText ("Velocity modulation  -  drag any knob to set its depth",
                     hintArea, juce::Justification::centredRight, false);
+    }
+
+    // ---- FX page ------------------------------------------------------------
+    if (uiState.mode.load() == EditorUiState::Mode::fx)
+    {
+        const auto panel = fxArea.toFloat();
+
+        g.setColour (theme::panel);
+        g.fillRoundedRectangle (panel, 6.0f);
+        g.setColour (theme::outline);
+        g.drawRoundedRectangle (panel, 6.0f, 1.0f);
+
+        auto header = fxArea.reduced (26, 20).removeFromTop (40);
+
+        g.setColour (theme::text);
+        g.setFont (theme::font (14.0f, juce::Font::bold));
+        g.drawText ("REVERB", header, juce::Justification::centredLeft, false);
+
+        g.setColour (theme::textDim);
+        g.setFont (theme::font (11.0f));
+        g.drawText ("Shared across all eight tracks. Each track's Send decides how much "
+                    "reaches it.", header, juce::Justification::centredRight, false);
     }
 
     // ---- Sequencer placeholder ----------------------------------------------

@@ -72,7 +72,7 @@ private:
 
     juce::Label kitLabel;
     MenuButton menuButton;
-    std::array<juce::TextButton, 3> tabButtons;
+    std::array<juce::TextButton, 4> tabButtons;
 
     EditorUiState uiState;
 
@@ -81,7 +81,7 @@ private:
     std::array<std::unique_ptr<ModelKnob>, 4> reverbKnobs;
 
     juce::Rectangle<int> topBarArea, titleArea, kitLabelArea, menuButtonArea, globalsArea,
-                        tabBarArea, hintArea, trackArea, seqArea;
+                        tabBarArea, hintArea, trackArea, seqArea, fxArea;
 
     /** The kit the editor last loaded, or -1 once the current sound matches no kit. */
     int currentKitIndex = -1;

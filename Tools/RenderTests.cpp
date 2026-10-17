@@ -20,6 +20,7 @@
 #include "Core/DrumKitProcessor.h"
 #include "Core/KitLibrary.h"
 #include "Core/Randomizer.h"
+#include "Core/Sequencer.h"
 #include "Core/Settings.h"
 #include "UI/DrumKitEditor.h"
 
@@ -1588,6 +1589,203 @@ void testNoteMapOptions()
     processor.setNoteMap (NoteMap::generalMidi);
 }
 
+void testSequencerCore()
+{
+    section ("Sequencer: speeds, Euclidean rhythms, envelopes and polyrhythm");
+
+    // ---- speeds are step durations in beats ----
+    check (std::abs (laneSpeedInBeats (LaneSpeed::halfBeat) - 0.5f) < 1.0e-6f,
+           "1/2 beat is half a beat");
+    check (std::abs (laneSpeedInBeats (LaneSpeed::beat) - 1.0f) < 1.0e-6f, "1 beat is a beat");
+    check (std::abs (laneSpeedInBeats (LaneSpeed::thirdBeat) - 1.0f / 3.0f) < 1.0e-6f,
+           "1/3 beat is a third, so triplets are available");
+    check (laneSpeedInBeats (LaneSpeed::eighthBeat) < laneSpeedInBeats (LaneSpeed::eightBeats),
+           "the speed list is in increasing step length");
+
+    // ---- Euclidean rhythms ----
+    {
+        juce::String pattern;
+
+        for (int step = 0; step < 8; ++step)
+            pattern << (euclideanStepOn (step, 3, 8) ? "x" : ".");
+
+        check (pattern == "x..x..x.", "E(3,8) is x..x..x.", pattern);
+    }
+
+    {
+        juce::String pattern;
+        int pulses = 0;
+
+        for (int step = 0; step < 16; ++step)
+        {
+            const bool on = euclideanStepOn (step, 5, 16);
+            pulses += on ? 1 : 0;
+            pattern << (on ? "x" : ".");
+        }
+
+        check (pulses == 5, "E(5,16) places exactly five pulses", juce::String (pulses));
+        check (euclideanStepOn (0, 5, 16), "E(5,16) starts on a pulse", pattern);
+    }
+
+    check (euclideanStepOn (3, 8, 8), "a lane with a pulse on every step is all on");
+    check (! euclideanStepOn (0, 0, 8), "zero pulses is silent");
+    check (euclideanStepOn (10, 3, 8) == euclideanStepOn (2, 3, 8),
+           "steps past the length wrap rather than reading out of range");
+
+    // ---- breakpoint envelope ----
+    {
+        SequencerLane lane;
+        lane.setDefaultsFor (LaneType::modulation);
+
+        check (std::abs (lane.modulationAt (0.0f) - (-1.0f)) < 1.0e-5f,
+               "the default ramp starts at the bottom", juce::String (lane.modulationAt (0.0f)));
+        check (std::abs (lane.modulationAt (0.5f) - 0.0f) < 1.0e-5f,
+               "and crosses zero halfway", juce::String (lane.modulationAt (0.5f)));
+        check (std::abs (lane.modulationAt (0.999f) - 0.998f) < 1.0e-3f,
+               "and approaches the top at the end of the cycle",
+               juce::String (lane.modulationAt (0.999f)));
+        check (std::abs (lane.modulationAt (1.0f) - (-1.0f)) < 1.0e-5f,
+               "while phase 1.0 is phase 0, so the ramp wraps rather than sticking");
+
+        lane.numPoints = 3;
+        lane.points[0] = { 0.0f, 1.0f };
+        lane.points[1] = { 0.25f, 1.0f };
+        lane.points[2] = { 1.0f, -1.0f };
+
+        check (std::abs (lane.modulationAt (0.5f) - (1.0f - 2.0f * (0.25f / 0.75f))) < 1.0e-4f,
+               "points hold flat then ramp linearly", juce::String (lane.modulationAt (0.5f)));
+        check (std::abs (lane.modulationAt (1.5f) - lane.modulationAt (0.5f)) < 1.0e-5f,
+               "and the phase wraps rather than running off the end");
+    }
+
+    // ---- transport: a lane fires on the step boundary, and only then ----
+    {
+        SequencerState state;
+        state.lanes[0].type = LaneType::grid;
+        state.lanes[0].length = 4;
+        state.lanes[0].speed = LaneSpeed::beat;
+        state.lanes[0].steps = {};          // all off
+        state.lanes[0].steps[0] = true;
+        state.lanes[0].steps[2] = true;
+
+        SequencerTransport transport;
+        std::array<LaneAction, kNumSequencerLanes> actions {};
+
+        // First block adopts the position without firing.
+        transport.advance (state, 0.0, 0.1, true, actions);
+        check (! actions[0].trigger, "the first block does not dump a step into the buffer");
+
+        // Moving to step 1: off.
+        transport.advance (state, 1.0, 1.1, true, actions);
+        check (! actions[0].trigger, "step 1 is off");
+
+        // Step 2: on.
+        transport.advance (state, 2.0, 2.1, true, actions);
+        check (actions[0].trigger, "step 2 fires");
+
+        // Step 3: off, then the pattern wraps to step 0 and fires again.
+        transport.advance (state, 3.0, 3.1, true, actions);
+        check (! actions[0].trigger, "step 3 is off");
+
+        transport.advance (state, 4.0, 4.1, true, actions);
+        check (actions[0].trigger, "and the pattern wraps back to step 0");
+
+        // Not playing: nothing fires.
+        transport.advance (state, 5.0, 5.1, false, actions);
+        check (! actions[0].trigger, "a stopped transport fires nothing");
+    }
+
+    // ---- independent speed and length: two lanes drift apart ----
+    {
+        SequencerState state;
+
+        // Lane 0: 3 steps at 1 beat. Lane 1: 4 steps at 1 beat. Classic 3-against-4.
+        for (int lane = 0; lane < 2; ++lane)
+        {
+            state.lanes[(size_t) lane].type = LaneType::grid;
+            state.lanes[(size_t) lane].speed = LaneSpeed::beat;
+            state.lanes[(size_t) lane].length = lane == 0 ? 3 : 4;
+            state.lanes[(size_t) lane].steps = {};
+
+            for (int i = 0; i < kMaxLaneSteps; ++i)
+                state.lanes[(size_t) lane].steps[(size_t) i] = true;
+        }
+
+        SequencerTransport transport;
+        std::array<LaneAction, kNumSequencerLanes> actions {};
+
+        transport.advance (state, 0.0, 0.1, true, actions);
+
+        int lane0Hits = 0, lane1Hits = 0;
+
+        // Sixteen beats covers a whole number of both cycles.
+        for (int step = 1; step <= 16; ++step)
+        {
+            transport.advance (state, (double) step, (double) step + 0.1, true, actions);
+            lane0Hits += actions[0].trigger ? 1 : 0;
+            lane1Hits += actions[1].trigger ? 1 : 0;
+        }
+
+        check (lane0Hits == lane1Hits,
+               "two lanes of different length but the same speed fire equally often",
+               juce::String (lane0Hits) + " vs " + juce::String (lane1Hits));
+        check (lane0Hits == 16, "and the faster-cycling lane produces a hit on every step");
+    }
+
+    // ---- a modulation lane reports a continuous value ----
+    {
+        SequencerState state;
+        state.lanes[0].type = LaneType::modulation;
+        state.lanes[0].length = 4;
+        state.lanes[0].speed = LaneSpeed::beat;
+        state.lanes[0].amount = 1.0f;
+        state.lanes[0].setDefaultsFor (LaneType::modulation);
+
+        SequencerTransport transport;
+        std::array<LaneAction, kNumSequencerLanes> actions {};
+
+        transport.advance (state, 0.0, 0.1, true, actions);
+        const float atStart = actions[0].value;
+
+        transport.advance (state, 2.0, 2.1, true, actions);
+        const float halfway = actions[0].value;
+
+        transport.advance (state, 4.0, 4.1, true, actions);
+        const float wrapped = actions[0].value;
+
+        check (actions[0].modulates, "a modulation lane reports a value rather than a trigger");
+        check (std::abs (atStart - (-1.0f)) < 1.0e-4f, "at the start of the cycle it is at the bottom");
+        check (std::abs (halfway - 0.0f) < 1.0e-4f, "halfway through it is at the middle",
+               juce::String (halfway));
+        check (std::abs (wrapped - (-1.0f)) < 1.0e-4f,
+               "and the cycle wraps rather than sticking at the top", juce::String (wrapped));
+    }
+
+    // ---- a seek does not fire the steps it passed over ----
+    {
+        SequencerState state;
+        state.lanes[0].type = LaneType::grid;
+        state.lanes[0].length = 4;
+        state.lanes[0].speed = LaneSpeed::beat;
+        state.lanes[0].steps = {};
+
+        for (int i = 0; i < kMaxLaneSteps; ++i)
+            state.lanes[0].steps[(size_t) i] = true;
+
+        SequencerTransport transport;
+        std::array<LaneAction, kNumSequencerLanes> actions {};
+
+        transport.advance (state, 0.0, 0.1, true, actions);
+        transport.advance (state, 100.0, 100.1, true, actions);
+
+        check (! actions[0].trigger, "a forward seek of a hundred beats re-adopts instead of firing");
+
+        transport.advance (state, 2.0, 2.1, true, actions);
+
+        check (! actions[0].trigger, "a backward seek does too");
+    }
+}
+
 void testEditorNoteLabels()
 {
     section ("Editor: the header note follows the map");
@@ -1683,6 +1881,7 @@ int main()
     testKitLibrary();
     testRandomiser();
     testNoteMapOptions();
+    testSequencerCore();
     testEditorNoteLabels();
 
     std::cout << "\n============================\n"
