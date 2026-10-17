@@ -1655,7 +1655,7 @@ void testSequencerCore()
         check (! anyStepOn, "a new grid lane starts empty, not with a starter pattern");
     }
 
-    check (! TriggerLane().enabled, "a new trigger lane starts disabled");
+    check (TriggerLane().enabled, "a new trigger lane starts enabled");
     check (TriggerLane().speed == LaneSpeed::xOne, "and its speed defaults to x1");
 
     // ---- breakpoint envelope ----
@@ -1947,6 +1947,93 @@ void testSequencerAudio()
     processor.releaseResources();
 }
 
+void testSequencerPersistence()
+{
+    section ("Sequencer: lanes survive a save and load");
+
+    setSettingsDirectoryOverride (juce::File::getSpecialLocation (juce::File::tempDirectory)
+                                      .getChildFile ("DrumForgeSeqSaveTests"));
+
+    DrumKitProcessor source;
+    auto& lanes = source.getSequencerState();
+
+    lanes.triggers[0].enabled = true;
+    lanes.triggers[0].mode = TriggerMode::euclidean;
+    lanes.triggers[0].speed = LaneSpeed::xThird;
+    lanes.triggers[0].length = 7;
+    lanes.triggers[0].trigs = 3;
+    lanes.triggers[0].offset = -2;
+
+    lanes.triggers[1].mode = TriggerMode::grid;
+    lanes.triggers[1].length = 5;
+
+    for (int i = 0; i < 5; ++i)
+        lanes.triggers[1].steps[(size_t) i] = (i % 2) == 0;
+
+    lanes.automation[0][0].enabled = true;
+    lanes.automation[0][0].speed = LaneSpeed::xQuarter;
+    lanes.automation[0][0].length = 3;
+    lanes.automation[0][0].target = (int) ModTarget::pan;
+    lanes.automation[0][0].amount = 0.75f;
+    lanes.automation[0][0].numPoints = 3;
+    lanes.automation[0][0].points[0] = { 0.0f, -0.5f };
+    lanes.automation[0][0].points[1] = { 0.4f, 1.0f };
+    lanes.automation[0][0].points[2] = { 1.0f, -1.0f };
+
+    juce::MemoryBlock saved;
+    source.getStateInformation (saved);
+
+    DrumKitProcessor restored;
+    restored.setStateInformation (saved.getData(), (int) saved.getSize());
+
+    const auto& back = restored.getSequencerState();
+
+    check (back.triggers[0].enabled, "the enable switch comes back");
+    check (back.triggers[0].mode == TriggerMode::euclidean, "so does the mode");
+    check (back.triggers[0].speed == LaneSpeed::xThird, "and the speed");
+    check (back.triggers[0].length == 7, "and the length");
+    check (back.triggers[0].trigs == 3 && back.triggers[0].offset == -2,
+           "and the Euclidean trigs and offset",
+           juce::String (back.triggers[0].trigs) + "/" + juce::String (back.triggers[0].offset));
+
+    check (back.triggers[1].length == 5, "a second lane keeps its own length");
+
+    bool stepsMatch = true;
+
+    for (int i = 0; i < 5; ++i)
+        stepsMatch = stepsMatch && back.triggers[1].steps[(size_t) i] == ((i % 2) == 0);
+
+    check (stepsMatch, "and its steps");
+
+    const auto& automation = back.automation[0][0];
+
+    check (automation.enabled, "the automation lane comes back enabled");
+    check (automation.target == (int) ModTarget::pan, "with its target");
+    check (automation.length == 3, "and its own length");
+    check (std::abs (automation.amount - 0.75f) < 1.0e-4f, "and its amount");
+
+    check (automation.numPoints == 3, "and every breakpoint",
+           juce::String (automation.numPoints));
+    check (std::abs (automation.points[1].position - 0.4f) < 1.0e-3f
+             && std::abs (automation.points[1].value - 1.0f) < 1.0e-3f,
+           "including their positions and values",
+           juce::String (automation.points[1].position) + " @ " + juce::String (automation.points[1].value));
+
+    // A session saved before lanes existed has no node at all, and must decode as defaults
+    // rather than keeping whatever the instance happened to be holding.
+    {
+        SequencerState stale;
+        stale.triggers[3].length = 29;
+        stale.triggers[3].enabled = false;
+
+        sequencerStateFromValueTree (juce::ValueTree(), stale);
+
+        check (stale.triggers[3].length == 16 && stale.triggers[3].enabled,
+               "a session with no lane data falls back to the defaults",
+               juce::String (stale.triggers[3].length));
+    }
+}
+
 void testEditorNoteLabels()
 {
     section ("Editor: the header note follows the map");
@@ -2044,6 +2131,7 @@ int main()
     testNoteMapOptions();
     testSequencerCore();
     testSequencerAudio();
+    testSequencerPersistence();
     testEditorNoteLabels();
 
     std::cout << "\n============================\n"

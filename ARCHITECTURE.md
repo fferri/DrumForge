@@ -379,6 +379,23 @@ other past the end of the range.
 The bit-identical guarantee still holds for the case it was written for: a nominal hit with
 no sequencer contribution returns the knob's value untouched.
 
+### Persistence
+
+The lanes are not parameters, so they ride in the APVTS tree as a `SEQUENCER` child, the same
+way the modulation depths do. `getStateInformation` copies the tree, replaces that child and
+serialises; `setStateInformation` reads it back after `replaceState`.
+
+Step patterns are stored as a 64-character bit string rather than 64 properties: compact, and
+it reads as a pattern when someone opens a project file in an editor. Breakpoints are encoded
+as `position:value;...` with the count implied.
+
+A session saved before lanes existed has no such node. That decodes as the defaults rather
+than leaving whatever the instance happened to be holding, which is the same rule the
+modulation depths follow.
+
+**Lanes are not part of a kit.** A kit is a sound; a pattern is an arrangement. Loading a kit
+must not overwrite the groove on the page.
+
 ### Threading
 
 The lane struct is written on the message thread (the page) and read on the audio thread

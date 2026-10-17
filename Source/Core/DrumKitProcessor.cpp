@@ -440,7 +440,15 @@ juce::AudioProcessorEditor* DrumKitProcessor::createEditor()
 
 void DrumKitProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    if (auto xml = apvts.copyState().createXml())
+    // The lanes are not parameters, so they ride alongside them in the same tree.
+    auto state = apvts.copyState();
+
+    if (const auto existing = state.getChildWithName (juce::Identifier ("SEQUENCER")); existing.isValid())
+        state.removeChild (existing, nullptr);
+
+    state.appendChild (sequencerStateToValueTree (sequencer), nullptr);
+
+    if (auto xml = state.createXml())
         copyXmlToBinary (*xml, destData);
 }
 
@@ -454,6 +462,10 @@ void DrumKitProcessor::setStateInformation (const void* data, int sizeInBytes)
 
             // The depths live in that tree, not in parameters, so re-mirror them.
             modulation.reloadFromState();
+
+            // The lanes too, and a session saved before they existed decodes as defaults.
+            sequencerStateFromValueTree (apvts.state.getChildWithName (juce::Identifier ("SEQUENCER")),
+                                         sequencer);
         }
     }
 }

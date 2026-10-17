@@ -164,6 +164,153 @@ float AutomationLane::modulationAt (float phase) const noexcept
 }
 
 //==============================================================================
+namespace
+{
+    const juce::Identifier sequencerNodeType { "SEQUENCER" };
+    const juce::Identifier trackNodeType { "TRACK" };
+    const juce::Identifier automationNodeType { "AUTO" };
+
+    juce::String encodePoints (const AutomationLane& lane)
+    {
+        juce::String encoded;
+
+        for (int i = 0; i < lane.numPoints; ++i)
+        {
+            const auto& point = lane.points[(size_t) i];
+            encoded << point.position << ":" << point.value << ";";
+        }
+
+        return encoded;
+    }
+
+    void decodePoints (const juce::String& encoded, AutomationLane& lane)
+    {
+        lane.numPoints = 0;
+
+        juce::StringArray chunks;
+        chunks.addTokens (encoded, ";", "");
+
+        for (const auto& chunk : chunks)
+        {
+            if (chunk.isEmpty() || lane.numPoints >= kMaxModPoints)
+                continue;
+
+            const int separator = chunk.indexOfChar (':');
+
+            if (separator <= 0)
+                continue;
+
+            const float position = chunk.substring (0, separator).getFloatValue();
+            const float value = chunk.substring (separator + 1).getFloatValue();
+
+            lane.points[(size_t) lane.numPoints] = { juce::jlimit (0.0f, 1.0f, position),
+                                                     juce::jlimit (-1.0f, 1.0f, value) };
+            ++lane.numPoints;
+        }
+
+        if (lane.numPoints == 0)
+            lane.setDefaultShape();
+    }
+}
+
+juce::ValueTree sequencerStateToValueTree (const SequencerState& state)
+{
+    juce::ValueTree root (sequencerNodeType);
+
+    for (int t = 0; t < kNumTracks; ++t)
+    {
+        const auto& trigger = state.triggers[(size_t) t];
+
+        juce::ValueTree track (trackNodeType);
+        track.setProperty ("enabled", trigger.enabled, nullptr);
+        track.setProperty ("mode", (int) trigger.mode, nullptr);
+        track.setProperty ("speed", (int) trigger.speed, nullptr);
+        track.setProperty ("length", trigger.length, nullptr);
+        track.setProperty ("trigs", trigger.trigs, nullptr);
+        track.setProperty ("offset", trigger.offset, nullptr);
+
+        // A 64-character bit string is compact and reads in a diff, which the XML of a
+        // project file often gets eyeballed in.
+        juce::String bits;
+
+        for (int i = 0; i < kMaxLaneSteps; ++i)
+            bits << (trigger.steps[(size_t) i] ? '1' : '0');
+
+        track.setProperty ("steps", bits, nullptr);
+
+        for (const auto& automation : state.automation[(size_t) t])
+        {
+            juce::ValueTree node (automationNodeType);
+            node.setProperty ("enabled", automation.enabled, nullptr);
+            node.setProperty ("speed", (int) automation.speed, nullptr);
+            node.setProperty ("length", automation.length, nullptr);
+            node.setProperty ("target", automation.target, nullptr);
+            node.setProperty ("amount", automation.amount, nullptr);
+            node.setProperty ("points", encodePoints (automation), nullptr);
+            track.appendChild (node, nullptr);
+        }
+
+        root.appendChild (track, nullptr);
+    }
+
+    return root;
+}
+
+void sequencerStateFromValueTree (const juce::ValueTree& tree, SequencerState& state)
+{
+    if (! tree.isValid() || ! tree.hasType (sequencerNodeType))
+    {
+        state = SequencerState {};
+        return;
+    }
+
+    for (int t = 0; t < juce::jmin (kNumTracks, tree.getNumChildren()); ++t)
+    {
+        const auto track = tree.getChild (t);
+
+        if (! track.hasType (trackNodeType))
+            continue;
+
+        auto& trigger = state.triggers[(size_t) t];
+        trigger.enabled = (bool) track.getProperty ("enabled", trigger.enabled);
+        trigger.mode = (TriggerMode) juce::jlimit (0, kNumTriggerModes - 1,
+                                                   (int) track.getProperty ("mode", 0));
+        trigger.speed = (LaneSpeed) juce::jlimit (0, kNumLaneSpeeds - 1,
+                                                  (int) track.getProperty ("speed", (int) LaneSpeed::xOne));
+        trigger.length = juce::jlimit (1, kMaxLaneSteps, (int) track.getProperty ("length", 16));
+        trigger.trigs = juce::jlimit (0, trigger.length, (int) track.getProperty ("trigs", 4));
+        trigger.offset = juce::jlimit (-trigger.length, trigger.length,
+                                       (int) track.getProperty ("offset", 0));
+
+        const auto bits = track.getProperty ("steps").toString();
+
+        for (int i = 0; i < kMaxLaneSteps; ++i)
+            trigger.steps[(size_t) i] = i < bits.length() && bits[i] == '1';
+
+        auto automationChildren = 0;
+
+        for (int c = 0; c < track.getNumChildren(); ++c)
+        {
+            const auto node = track.getChild (c);
+
+            if (! node.hasType (automationNodeType) || automationChildren >= kMaxAutomationLanes)
+                continue;
+
+            auto& automation = state.automation[(size_t) t][(size_t) automationChildren];
+            automation.enabled = (bool) node.getProperty ("enabled", false);
+            automation.speed = (LaneSpeed) juce::jlimit (0, kNumLaneSpeeds - 1,
+                                                         (int) node.getProperty ("speed", (int) LaneSpeed::xOne));
+            automation.length = juce::jlimit (1, kMaxLaneSteps, (int) node.getProperty ("length", 4));
+            automation.target = juce::jlimit (0, kNumModTargets - 1,
+                                              (int) node.getProperty ("target", 0));
+            automation.amount = juce::jlimit (0.0f, 1.0f, (float) (double) node.getProperty ("amount", 0.5));
+            decodePoints (node.getProperty ("points").toString(), automation);
+
+            ++automationChildren;
+        }
+    }
+}
+
 void SequencerTransport::reset() noexcept
 {
     lastStep.fill (0.0);

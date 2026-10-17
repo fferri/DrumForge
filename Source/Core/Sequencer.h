@@ -83,7 +83,9 @@ struct ModPoint
 */
 struct TriggerLane
 {
-    bool enabled = false;
+    /** On by default: a lane with no steps is silent anyway, so starting enabled means the
+        switch reflects what you intend rather than having to be found first. */
+    bool enabled = true;
     TriggerMode mode = TriggerMode::grid;
     LaneSpeed speed = LaneSpeed::xOne;
     int length = 16;
@@ -165,6 +167,14 @@ struct SequencerOutput
 
     Audio-thread safe: no allocation, no locks, no containers.
 */
+/** Serialises every lane into a ValueTree, for the session.
+    The element name is stable: it is read back out of a saved project. */
+juce::ValueTree sequencerStateToValueTree (const SequencerState&);
+
+/** The inverse. A tree that is missing or unrecognised leaves the state at its defaults,
+    which is what an older session - saved before lanes existed - should decode as. */
+void sequencerStateFromValueTree (const juce::ValueTree&, SequencerState&);
+
 class SequencerTransport
 {
 public:

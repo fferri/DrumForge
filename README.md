@@ -296,7 +296,8 @@ last.
 ### The sequencer
 
 Every track has **one trigger sequencer**, and it is either a **grid** or a **Euclidean**
-pattern. An **On** checkbox under the track name enables it.
+pattern. An **On** checkbox under the track name enables it; new lanes start enabled, so
+the switch is there to silence one rather than to wake it up.
 
 - **Speed** — a multiplier of a 1/16 note. Bigger is faster.
 - **Steps** — how many steps before the pattern repeats, 1 to 64.
@@ -341,7 +342,9 @@ parameter:
 
 - **1 2 3 4** — which of the track's four lanes you are editing, as micro-tabs so all four
   are visible at once.
-- **On** — whether that lane runs, under the track name.
+- **On** — whether that lane runs, under the track name. Automation lanes start **off**,
+  because four ramps per track sweeping from the moment you open the plugin is not a
+  sensible default.
 - **Speed** and **Steps** — its own, so each lane loops on its own length, independently of
   the track's trigger sequencer and of the other three automation lanes.
 - **Target** — any of the nine per-track parameters.
@@ -359,8 +362,9 @@ stop. A lane never fires on the first block after you press play, so starting mi
 not dump a step into the buffer, and seeking past a run of steps does not fire them all at
 once.
 
-> The lanes are not yet saved with your session or with a kit — that is the next piece of
-> work. Everything else on these pages is live.
+**Everything on these pages is saved with your session.** Patterns and envelopes come back
+exactly as you left them. They are deliberately *not* part of a kit: a kit is a sound, and a
+pattern is an arrangement. Loading someone's kit should not overwrite the groove you wrote.
 
 ---
 
