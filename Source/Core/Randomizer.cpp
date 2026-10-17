@@ -56,6 +56,91 @@ int randomInterval (Rng& rng)
 
 } // namespace
 
+namespace
+{
+    int randomInt (Rng& rng, int low, int high) noexcept
+    {
+        if (high <= low)
+            return low;
+
+        return low + (int) (rng.nextU32() % (uint32_t) (high - low + 1));
+    }
+
+    float randomFloat (Rng& rng, float low, float high) noexcept
+    {
+        return low + rng.nextUnipolar() * (high - low);
+    }
+}
+
+void randomiseTriggerLane (TriggerLane& lane, Rng& rng)
+{
+    static constexpr LaneSpeed speeds[]
+    {
+        LaneSpeed::xQuarter, LaneSpeed::xThird, LaneSpeed::xHalf,
+        LaneSpeed::xOne, LaneSpeed::xTwo
+    };
+
+    lane.speed = speeds[rng.nextU32() % (sizeof (speeds) / sizeof (speeds[0]))];
+    lane.enabled = true;
+
+    if (lane.mode == TriggerMode::euclidean)
+    {
+        // At least one pulse, or the lane would be silently switched on.
+        lane.trigs = randomInt (rng, 1, juce::jmax (1, lane.length));
+        lane.offset = randomInt (rng, -lane.length, lane.length);
+        return;
+    }
+
+    // Roughly a third of the steps, which reads as a pattern rather than a metronome or a
+    // wall. Every step gets a velocity whether or not it is on, so switching one on later
+    // does not bring back a stale value.
+    for (int i = 0; i < kMaxLaneSteps; ++i)
+    {
+        auto& step = lane.steps[(size_t) i];
+
+        step.on = randomInt (rng, 0, 2) == 0;
+        step.velocity = (float) randomInt (rng, 40, 127);
+    }
+
+    // Four on the floor is the one thing a roll should not be able to produce by accident,
+    // because it looks like the button did nothing.
+    bool anyOdd = false;
+
+    for (int i = 0; i < lane.length; ++i)
+        anyOdd = anyOdd || ((i % 4) != 0 && lane.steps[(size_t) i].on);
+
+    if (! anyOdd)
+        lane.steps[(size_t) (randomInt (rng, 0, juce::jmax (0, lane.length - 1)) % juce::jmax (1, lane.length))]
+            .on = true;
+}
+
+void randomiseAutomationLane (AutomationLane& lane, Rng& rng)
+{
+    // Between two and five points: one segment is a straight line, and more than five on a
+    // strip this wide is fiddly to grab.
+    const int points = randomInt (rng, 2, 5);
+
+    lane.numPoints = points;
+
+    for (int i = 0; i < points; ++i)
+    {
+        // Evenly spaced with a jitter, then pinned to the ends so the envelope spans the
+        // whole cycle instead of leaving dead zones.
+        const float spread = (float) i / (float) (points - 1);
+        const float jitter = (i == 0 || i == points - 1) ? 0.0f : randomFloat (rng, -0.06f, 0.06f);
+
+        lane.points[(size_t) i].position = juce::jlimit (0.0f, 1.0f, spread + jitter);
+        lane.points[(size_t) i].value = randomFloat (rng, -1.0f, 1.0f);
+    }
+
+    // Keep them ordered after the jitter.
+    for (int i = 1; i < points; ++i)
+        lane.points[(size_t) i].position = juce::jmax (lane.points[(size_t) i].position,
+                                                        lane.points[(size_t) (i - 1)].position);
+
+    lane.enabled = true;
+}
+
 void randomiseTrack (DrumKitProcessor& processor, int trackIndex, Rng& rng)
 {
     if (! juce::isPositiveAndBelow (trackIndex, kNumTracks))

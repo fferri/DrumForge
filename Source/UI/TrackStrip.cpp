@@ -216,7 +216,7 @@ void TrackStrip::resized()
         stack.removeFromTop (4);
         distArea = stack.removeFromTop (cell);
         stack.removeFromTop (4);
-        randomiseButton.setBounds (stack.removeFromTop (cell));
+        randomiseButton.setBounds (stack.removeFromTop (cell).withSizeKeepingCentre (46, cell));
     }
     area.removeFromLeft (8);
 

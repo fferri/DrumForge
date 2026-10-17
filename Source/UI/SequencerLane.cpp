@@ -102,6 +102,16 @@ SequencerLaneComponent::SequencerLaneComponent (DrumKitProcessor& owner, int ind
     enabledButton.onClick = [this] { lane().enabled = enabledButton.getToggleState(); repaint(); };
     addAndMakeVisible (enabledButton);
 
+    randomiseButton.setTooltip ("Roll a new speed and pattern, and switch the lane on.\n"
+                                "The length is kept, so the cycle you set stays put.");
+    randomiseButton.onClick = [this]
+    {
+        randomiseTriggerLane (lane(), randomRng);
+        syncControls();
+        repaint();
+    };
+    addAndMakeVisible (randomiseButton);
+
     for (int i = 0; i < kNumTriggerModes; ++i)
         modeBox.addItem (triggerModeName ((TriggerMode) i), i + 1);
 
@@ -204,7 +214,10 @@ void SequencerLaneComponent::resized()
         stack.removeFromTop (2);
         lengthStepper.setBounds (stack.removeFromTop (cellHeight));
         stack.removeFromTop (2);
-        enabledButton.setBounds (stack.removeFromTop (cellHeight));
+
+        auto lastRow = stack.removeFromTop (cellHeight);
+        enabledButton.setBounds (lastRow.removeFromLeft (76));
+        randomiseButton.setBounds (lastRow.removeFromLeft (32).reduced (2, 0));
     }
 
     area.removeFromLeft (10);
@@ -401,6 +414,16 @@ AutomationLaneComponent::AutomationLaneComponent (DrumKitProcessor& owner, int i
     enabledButton.onClick = [this] { lane().enabled = enabledButton.getToggleState(); repaint(); };
     addAndMakeVisible (enabledButton);
 
+    randomiseButton.setTooltip ("Draw a new envelope for this parameter, and switch the lane "
+                                "on.\nSpeed and length are kept.");
+    randomiseButton.onClick = [this]
+    {
+        randomiseAutomationLane (lane(), randomRng);
+        syncControls();
+        repaint();
+    };
+    addAndMakeVisible (randomiseButton);
+
 
     for (int i = 0; i < kNumLaneSpeeds; ++i)
         speedBox.addItem (laneSpeedName ((LaneSpeed) i), i + 1);
@@ -511,7 +534,10 @@ void AutomationLaneComponent::resized()
         stack.removeFromTop (2);
         lengthStepper.setBounds (stack.removeFromTop (cellHeight));
         stack.removeFromTop (2);
-        enabledButton.setBounds (stack.removeFromTop (cellHeight));
+
+        auto lastRow = stack.removeFromTop (cellHeight);
+        enabledButton.setBounds (lastRow.removeFromLeft (76));
+        randomiseButton.setBounds (lastRow.removeFromLeft (32).reduced (2, 0));
     }
 
     area.removeFromLeft (10);

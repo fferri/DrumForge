@@ -68,6 +68,42 @@ public:
     }
 };
 
+/** The randomise button, drawn as a die.
+
+    An icon rather than the letters RND: it appears once per track on three pages, and three
+    letters repeated thirty times is a lot of noise for one repeated action.
+*/
+class DiceButton final : public juce::Button
+{
+public:
+    DiceButton() : juce::Button ("Randomise") {}
+
+    void paintButton (juce::Graphics& g, bool highlighted, bool down) override
+    {
+        const auto bounds = getLocalBounds().toFloat().reduced (1.0f);
+
+        g.setColour (down ? theme::accent.withAlpha (0.85f)
+                          : (highlighted ? theme::panelAlt.brighter (0.18f) : theme::panelAlt));
+        g.fillRoundedRectangle (bounds, 4.0f);
+
+        g.setColour (theme::outline);
+        g.drawRoundedRectangle (bounds, 4.0f, 1.0f);
+
+        g.setColour (down ? theme::background : theme::text);
+
+        // A die face: four corners and the centre pip.
+        const float radius = juce::jmax (1.3f, juce::jmin (bounds.getWidth(), bounds.getHeight()) * 0.075f);
+        const float offset = juce::jmin (bounds.getWidth(), bounds.getHeight()) * 0.26f;
+
+        for (int i = -1; i <= 1; ++i)
+            for (int j = -1; j <= 1; ++j)
+                if ((i + j) % 2 == 0)
+                    g.fillEllipse (bounds.getCentreX() + (float) i * offset - radius,
+                                   bounds.getCentreY() + (float) j * offset - radius,
+                                   radius * 2.0f, radius * 2.0f);
+    }
+};
+
 /** The kit name in the top bar.
 
     A label rather than a button, so it reads as the instrument's current state rather than

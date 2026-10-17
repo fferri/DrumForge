@@ -2157,6 +2157,95 @@ void testKitLoadLeavesControlsFree()
            juce::String (processor.getSelectedModel (0)));
 }
 
+void testLaneRandomisers()
+{
+    section ("Sequencer: the lane dice roll usable lanes");
+
+    Rng rng (0x5eed1234u);
+
+    // ---- trigger lanes ----
+    {
+        bool enabled = true, lengthKept = true, anyOn = true, anyOff = true, valid = true;
+        bool euclideanSane = true;
+
+        for (int roll = 0; roll < 40; ++roll)
+        {
+            TriggerLane lane;
+            lane.length = 12;
+
+            randomiseTriggerLane (lane, rng);
+
+            enabled = enabled && lane.enabled;
+            lengthKept = lengthKept && lane.length == 12;
+
+            bool on = false, off = false;
+
+            for (int i = 0; i < lane.length; ++i)
+            {
+                const auto& step = lane.steps[(size_t) i];
+                on = on || step.on;
+                off = off || ! step.on;
+                valid = valid && step.velocity >= 40.0f && step.velocity <= 127.0f;
+            }
+
+            anyOn = anyOn && on;
+            anyOff = anyOff && off;
+
+            TriggerLane euclid;
+            euclid.mode = TriggerMode::euclidean;
+            euclid.length = 12;
+            randomiseTriggerLane (euclid, rng);
+
+            euclideanSane = euclideanSane && euclid.enabled
+                              && euclid.trigs >= 1 && euclid.trigs <= euclid.length
+                              && euclid.offset >= -euclid.length && euclid.offset <= euclid.length;
+        }
+
+        check (enabled, "a rolled trigger lane is switched on");
+        check (lengthKept, "and keeps its length, so the cycle does not move under you");
+        check (anyOn && anyOff, "a rolled grid has both steps on and steps off");
+        check (valid, "every rolled velocity is inside 40..127");
+        check (euclideanSane, "a rolled Euclidean lane has playable trigs and offset");
+    }
+
+    // ---- automation lanes ----
+    {
+        bool enabled = true, kept = true, shapeOk = true, ordered = true;
+
+        for (int roll = 0; roll < 40; ++roll)
+        {
+            AutomationLane lane;
+            lane.speed = LaneSpeed::xThird;
+            lane.length = 7;
+            lane.amount = 0.42f;
+
+            randomiseAutomationLane (lane, rng);
+
+            enabled = enabled && lane.enabled;
+            kept = kept && lane.speed == LaneSpeed::xThird && lane.length == 7
+                        && std::abs (lane.amount - 0.42f) < 1.0e-6f;
+
+            shapeOk = shapeOk && lane.numPoints >= 2 && lane.numPoints <= 5;
+
+            for (int i = 0; i < lane.numPoints; ++i)
+            {
+                const auto& point = lane.points[(size_t) i];
+
+                shapeOk = shapeOk && point.position >= 0.0f && point.position <= 1.0f
+                                    && point.value >= -1.0f && point.value <= 1.0f;
+
+                if (i > 0)
+                    ordered = ordered && point.position >= lane.points[(size_t) (i - 1)].position;
+            }
+        }
+
+        check (enabled, "a rolled automation lane is switched on");
+        check (kept, "and keeps its speed, length and amount");
+        check (shapeOk, "the envelope has 2..5 points, all inside the strip");
+        check (ordered, "with the points kept in order, so interpolation cannot run backwards");
+    }
+}
+
 void testEditorNoteLabels()
 {
     section ("Editor: the header note follows the map");
@@ -2256,6 +2345,7 @@ int main()
     testSequencerAudio();
     testSequencerPersistence();
     testKitLoadLeavesControlsFree();
+    testLaneRandomisers();
     testEditorNoteLabels();
 
     std::cout << "\n============================\n"

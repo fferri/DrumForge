@@ -6,6 +6,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "../Core/DrumKitProcessor.h"
+#include "../Core/Randomizer.h"
 #include "Theme.h"
 #include "TrackHeader.h"
 
@@ -76,12 +77,14 @@ private:
     const int trackIndex;
 
     juce::ToggleButton enabledButton { "On" };
+    DiceButton randomiseButton;
     juce::ComboBox modeBox, speedBox;
     ValueStepper lengthStepper { "Steps", 1, kMaxLaneSteps };
     ValueStepper trigsStepper { "Trigs", 0, kMaxLaneSteps };
     ValueStepper offsetStepper { "Offset", -kMaxLaneSteps, kMaxLaneSteps };
 
     TrackHeader header;
+    Rng randomRng;
     juce::Rectangle<int> headerArea, controlsArea, euclideanArea, editorBounds;
 
     /** The step being clicked, so a click can toggle and a vertical drag can set velocity
@@ -134,11 +137,13 @@ private:
     int slot = 0;
 
     juce::ToggleButton enabledButton { "On" };
+    DiceButton randomiseButton;
     juce::ComboBox speedBox;
     ValueStepper lengthStepper { "Steps", 1, kMaxLaneSteps };
     juce::Slider amountSlider;
 
     TrackHeader header;
+    Rng randomRng;
     juce::Rectangle<int> tabArea, headerArea, controlsArea, editorBounds, amountLabelArea;
 
     static constexpr int tabHeight = 16;

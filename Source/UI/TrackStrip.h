@@ -8,6 +8,7 @@
 #include "../Core/DrumKitProcessor.h"
 #include "../Core/Randomizer.h"
 #include "ModelKnob.h"
+#include "Theme.h"
 #include "TrackHeader.h"
 #include "Theme.h"
 #include "UiState.h"
@@ -57,7 +58,7 @@ private:
     juce::ComboBox distBox;
     TrackHeader header;
     juce::TextButton muteButton { "M" }, soloButton { "S" };
-    juce::TextButton randomiseButton { "RND" };
+    DiceButton randomiseButton;
 
     std::unique_ptr<ModelKnob> decayKnob, toneKnob, characterKnob, sweepKnob;
     std::unique_ptr<ModelKnob> tuneKnob, levelKnob, panKnob, driveKnob, sendKnob;

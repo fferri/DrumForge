@@ -4,6 +4,7 @@
 
 #include "DrumKitProcessor.h"
 #include "DspUtils.h"
+#include "Sequencer.h"
 
 namespace df
 {
@@ -25,5 +26,21 @@ namespace df
     cannot hear your way back from.
 */
 void randomiseTrack (DrumKitProcessor& processor, int trackIndex, Rng& rng);
+
+/** Rolls a lane's speed and pattern, and switches it on.
+
+    The length is left alone: it is the polymeter, and preserving it means a roll changes
+    the rhythm inside the cycle rather than the cycle itself. Speed comes from a musical
+    subset - the very slow and very fast ends of the range are rarely what you want and
+    would mostly produce a lane that is either inaudible or a blur.
+*/
+void randomiseTriggerLane (TriggerLane& lane, Rng& rng);
+
+/** Rolls a fresh breakpoint envelope for the lane, and switches it on.
+
+    Speed, length and amount are left alone: they belong to the lane, and the point of the
+    button here is a new shape for the parameter you are already looking at.
+*/
+void randomiseAutomationLane (AutomationLane& lane, Rng& rng);
 
 } // namespace df
