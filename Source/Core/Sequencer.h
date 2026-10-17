@@ -10,13 +10,12 @@ namespace df
 
 /** The speed multiplier for a lane.
 
-    A step is a 1/16 note divided by the multiplier, so **larger is faster**, and **zero is
-    off** - a lane at speed 0 does nothing, which is how a lane is disabled without a
-    separate on/off switch.
+    A step is a 1/16 note divided by the multiplier, so **larger is faster**. There is no
+    "off" in this list: a lane is disabled by its own switch, so that speed always means
+    speed and the control does not do double duty.
 
     | Multiplier | Step length | At 120 BPM |
     |---|---|---|
-    | 0    | -             | stopped |
     | 1/8  | 1/2 note      | 1000 ms |
     | 1/4  | 1/4 note      |  500 ms |
     | 1/3  | 3/16 note     |  375 ms |
@@ -30,8 +29,7 @@ namespace df
 */
 enum class LaneSpeed
 {
-    off = 0,
-    xEighth,
+    xEighth = 0,
     xQuarter,
     xThird,
     xHalf,
@@ -43,12 +41,12 @@ enum class LaneSpeed
     xEight
 };
 
-constexpr int kNumLaneSpeeds = 11;
+constexpr int kNumLaneSpeeds = 10;
 
-/** The multiplier itself: 0, 1/8, 1/4, 1/3, ..., 8. */
+/** The multiplier itself: 1/8, 1/4, 1/3, ..., 8. */
 float laneSpeedMultiplier (LaneSpeed) noexcept;
 
-/** Step duration in beats: (1/16 note) / multiplier = 0.25 / multiplier. Zero when off. */
+/** Step duration in beats: (1/16 note) / multiplier = 0.25 / multiplier. */
 float laneSpeedInBeats (LaneSpeed) noexcept;
 
 const char* laneSpeedName (LaneSpeed) noexcept;
@@ -85,8 +83,9 @@ struct ModPoint
 */
 struct TriggerLane
 {
+    bool enabled = false;
     TriggerMode mode = TriggerMode::grid;
-    LaneSpeed speed = LaneSpeed::off;
+    LaneSpeed speed = LaneSpeed::xOne;
     int length = 16;
 
     /** Grid pattern; only the first `length` entries are used. */
@@ -120,7 +119,8 @@ bool euclideanStepOn (int step, int pulses, int steps) noexcept;
 */
 struct AutomationLane
 {
-    LaneSpeed speed = LaneSpeed::off;
+    bool enabled = false;
+    LaneSpeed speed = LaneSpeed::xOne;
     int length = 4;
 
     int target = 0;      ///< a ModTarget index
@@ -155,6 +155,10 @@ struct SequencerOutput
     /** Summed automation offsets per track, in normalised parameter space, -1..+1. Lanes
         aimed at the same parameter add up. */
     std::array<std::array<float, (size_t) kNumModTargets>, (size_t) kNumTracks> offsets {};
+
+    /** Where each lane is in its cycle, 0..1. The editor draws a playhead from this. */
+    std::array<float, (size_t) kNumTracks> triggerPhase {};
+    std::array<std::array<float, (size_t) kMaxAutomationLanes>, (size_t) kNumTracks> automationPhase {};
 };
 
 /** Turns a transport position into triggers and offsets.

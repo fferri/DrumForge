@@ -89,6 +89,18 @@ public:
     /** The sequencer lanes. Message thread; the audio thread reads the same object. */
     SequencerState& getSequencerState() noexcept { return sequencer; }
     const SequencerState& getSequencerState() const noexcept { return sequencer; }
+
+    /** Where a lane's cycle sits, 0..1, for the editor's playhead. */
+    float getTriggerPhase (int trackIndex) const noexcept
+    {
+        return triggerPhase[(size_t) juce::jlimit (0, kNumTracks - 1, trackIndex)].load();
+    }
+
+    float getAutomationPhase (int trackIndex, int slot) const noexcept
+    {
+        return automationPhase[(size_t) juce::jlimit (0, kNumTracks - 1, trackIndex)]
+                              [(size_t) juce::jlimit (0, kMaxAutomationLanes - 1, slot)].load();
+    }
     const ModulationState& getModulationState() const noexcept { return modulation; }
 
     /** Sets how far a velocity sweep moves one parameter. `depth` is -1..1. Message thread. */
@@ -152,6 +164,11 @@ private:
 
     /** Audio-thread only: turns transport position into lane actions. */
     SequencerTransport transport;
+
+    /** Mirrors of the transport's playhead position, for the editor. */
+    std::array<std::atomic<float>, (size_t) kNumTracks> triggerPhase {};
+    std::array<std::array<std::atomic<float>, (size_t) kMaxAutomationLanes>,
+               (size_t) kNumTracks> automationPhase {};
 
     /** Audio-thread only: the offset each modulation lane contributes this block. */
     std::array<std::array<float, (size_t) kNumModTargets>, (size_t) kNumTracks> sequenceOffsets {};

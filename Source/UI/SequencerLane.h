@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <functional>
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -70,6 +71,7 @@ private:
     DrumKitProcessor& processor;
     const int trackIndex;
 
+    juce::ToggleButton enabledButton { "On" };
     juce::ComboBox modeBox, speedBox;
     ValueStepper lengthStepper { "Steps", 1, kMaxLaneSteps };
     ValueStepper trigsStepper { "Trigs", 0, kMaxLaneSteps };
@@ -116,7 +118,9 @@ private:
     const int trackIndex;
     int slot = 0;
 
-    juce::ComboBox slotBox, speedBox, targetBox;
+    juce::ToggleButton enabledButton { "On" };
+    std::array<juce::TextButton, kMaxAutomationLanes> slotButtons;
+    juce::ComboBox speedBox, targetBox;
     ValueStepper lengthStepper { "Steps", 1, kMaxLaneSteps };
     juce::Slider amountSlider;
 

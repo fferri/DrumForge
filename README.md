@@ -296,9 +296,9 @@ last.
 ### The sequencer
 
 Every track has **one trigger sequencer**, and it is either a **grid** or a **Euclidean**
-pattern. Both share the same two controls:
+pattern. An **On** checkbox under the track name enables it.
 
-- **Speed** — a multiplier of a 1/16 note. Bigger is faster, and **Off** stops the lane.
+- **Speed** — a multiplier of a 1/16 note. Bigger is faster.
 - **Steps** — how many steps before the pattern repeats, 1 to 64.
 
 Independent length and speed per track is what produces polymeters: a 5-step lane against a
@@ -306,7 +306,6 @@ Independent length and speed per track is what produces polymeters: a 5-step lan
 
 | Multiplier | Step length | At 120 BPM |
 |---|---|---|
-| Off | stopped | - |
 | ×1/8 | a 1/2 note | 1000 ms |
 | ×1/4 | a 1/4 note | 500 ms |
 | ×1/3 | a 3/16 note | 375 ms |
@@ -321,6 +320,13 @@ Independent length and speed per track is what produces polymeters: a 5-step lan
 The odd ratios are the point: ×1/3 and ×3 give triplet feels against straight lanes on the
 same bar.
 
+Speed always means speed — the lane is switched off by its own checkbox, so the control never
+does double duty.
+
+Each lane draws a **playhead**: a line that walks across the steps as the cycle runs, so you
+can see at a glance where every lane is, and how lanes of different lengths drift against
+each other.
+
 In **Euclidean** mode the row also shows:
 
 - **Trigs** — how many pulses to spread across the steps, 0 to the length.
@@ -333,8 +339,11 @@ Rhythm and movement are separate decisions, so they live on separate pages. **AU
 each track up to **four automation lanes**, each a breakpoint envelope sweeping one
 parameter:
 
-- **Slot** — which of the track's four lanes you are editing.
-- **Speed** and **Steps** — its own, independent of the track's trigger sequencer.
+- **1 2 3 4** — which of the track's four lanes you are editing, as micro-tabs so all four
+  are visible at once.
+- **On** — whether that lane runs, under the track name.
+- **Speed** and **Steps** — its own, so each lane loops on its own length, independently of
+  the track's trigger sequencer and of the other three automation lanes.
 - **Target** — any of the nine per-track parameters.
 - **Amount** — how far the envelope moves it.
 

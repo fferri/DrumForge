@@ -93,6 +93,10 @@ SequencerLaneComponent::SequencerLaneComponent (DrumKitProcessor& owner, int ind
     addAndMakeVisible (modeBox);
     addAndMakeVisible (speedBox);
 
+    enabledButton.setTooltip ("Whether this lane plays.");
+    enabledButton.onClick = [this] { lane().enabled = enabledButton.getToggleState(); repaint(); };
+    addAndMakeVisible (enabledButton);
+
     for (int i = 0; i < kNumTriggerModes; ++i)
         modeBox.addItem (triggerModeName ((TriggerMode) i), i + 1);
 
@@ -137,6 +141,7 @@ void SequencerLaneComponent::syncControls()
 {
     const auto& current = lane();
 
+    enabledButton.setToggleState (current.enabled, juce::dontSendNotification);
     modeBox.setSelectedId ((int) current.mode + 1, juce::dontSendNotification);
     speedBox.setSelectedId ((int) current.speed + 1, juce::dontSendNotification);
 
@@ -178,6 +183,8 @@ void SequencerLaneComponent::resized()
 
     identityArea = area.removeFromLeft (84);
     area.removeFromLeft (6);
+
+    enabledButton.setBounds (identityArea.removeFromBottom (17).reduced (0, 1));
 
     // The three selectors stack, which is what leaves the row wide enough for the steps.
     controlsArea = area.removeFromLeft (118);
@@ -269,7 +276,7 @@ void SequencerLaneComponent::paint (juce::Graphics& g)
     g.setColour (juce::Colour (0xff101317));
     g.fillRoundedRectangle (grid, 3.0f);
 
-    const bool running = current.speed != LaneSpeed::off;
+    const bool running = current.enabled;
     const int columns = juce::jmax (1, current.length);
     const float cellWidth = grid.getWidth() / (float) columns;
     const float inset = juce::jmin (2.0f, cellWidth * 0.15f);
@@ -288,26 +295,54 @@ void SequencerLaneComponent::paint (juce::Graphics& g)
                                 grid.getHeight() - inset * 2.0f,
                                 1.5f);
     }
+
+    // ---- Playhead ------------------------------------------------------------
+    if (running)
+    {
+        const float x = grid.getX()
+                          + processor.getTriggerPhase (trackIndex) * grid.getWidth();
+
+        g.setColour (theme::text.withAlpha (0.75f));
+        g.fillRect (juce::Rectangle<float> (x - 1.0f, grid.getY(), 2.0f, grid.getHeight()));
+    }
 }
 
 //==============================================================================
 AutomationLaneComponent::AutomationLaneComponent (DrumKitProcessor& owner, int index)
     : processor (owner), trackIndex (index)
 {
-    slotBox.setTooltip ("Which automation lane to edit. A track can carry four.");
-    speedBox.setTooltip ("How fast the envelope runs. Off stops it.");
+    speedBox.setTooltip ("How fast the envelope runs.");
     targetBox.setTooltip ("Which parameter the envelope moves.");
     lengthStepper.setBoundsTo (getLocalBounds());
-    lengthStepper.setTooltip ("How many steps the envelope spans.");
+    lengthStepper.setTooltip ("How many steps the envelope spans before it loops. Its own "
+                              "length, independent of the track's trigger sequencer.");
 
-    for (auto* box : { &slotBox, &speedBox, &targetBox })
+    for (auto* box : { &speedBox, &targetBox })
     {
         box->addListener (this);
         addAndMakeVisible (*box);
     }
 
+    enabledButton.setTooltip ("Whether this automation lane runs.");
+    enabledButton.onClick = [this] { lane().enabled = enabledButton.getToggleState(); repaint(); };
+    addAndMakeVisible (enabledButton);
+
+    // A micro tab bar rather than a combo: with only four lanes, seeing all of them at once
+    // is quicker than opening a list.
     for (int i = 0; i < kMaxAutomationLanes; ++i)
-        slotBox.addItem (juce::String (i + 1), i + 1);
+    {
+        auto& button = slotButtons[(size_t) i];
+        button.setButtonText (juce::String (i + 1));
+        button.setClickingTogglesState (false);
+        button.setTooltip ("Automation lane " + juce::String (i + 1));
+        button.onClick = [this, i]
+        {
+            slot = i;
+            syncControls();
+            repaint();
+        };
+        addAndMakeVisible (button);
+    }
 
     for (int i = 0; i < kNumLaneSpeeds; ++i)
         speedBox.addItem (laneSpeedName ((LaneSpeed) i), i + 1);
@@ -350,7 +385,21 @@ void AutomationLaneComponent::syncControls()
 {
     const auto& current = lane();
 
-    slotBox.setSelectedId (slot + 1, juce::dontSendNotification);
+    for (int i = 0; i < kMaxAutomationLanes; ++i)
+    {
+        const bool active = i == slot;
+        auto& button = slotButtons[(size_t) i];
+
+        button.setToggleState (active, juce::dontSendNotification);
+        button.setColour (juce::TextButton::buttonColourId,
+                          active ? theme::accent : theme::panelAlt);
+        button.setColour (juce::TextButton::textColourOffId,
+                          active ? theme::background : theme::textDim);
+        button.setColour (juce::TextButton::textColourOnId,
+                          active ? theme::background : theme::textDim);
+    }
+
+    enabledButton.setToggleState (current.enabled, juce::dontSendNotification);
     speedBox.setSelectedId ((int) current.speed + 1, juce::dontSendNotification);
     targetBox.setSelectedId (juce::jlimit (0, kNumModTargets - 1, current.target) + 1,
                              juce::dontSendNotification);
@@ -360,14 +409,6 @@ void AutomationLaneComponent::syncControls()
 
 void AutomationLaneComponent::comboBoxChanged (juce::ComboBox* box)
 {
-    if (box == &slotBox)
-    {
-        slot = juce::jlimit (0, kMaxAutomationLanes - 1, slotBox.getSelectedId() - 1);
-        syncControls();
-        repaint();
-        return;
-    }
-
     auto& current = lane();
 
     if (box == &speedBox)
@@ -391,12 +432,21 @@ void AutomationLaneComponent::resized()
     identityArea = area.removeFromLeft (84);
     area.removeFromLeft (6);
 
+    enabledButton.setBounds (identityArea.removeFromBottom (17).reduced (0, 1));
+
     controlsArea = area.removeFromLeft (118);
     {
         auto stack = controlsArea;
         const int cellHeight = juce::jmin (20, (stack.getHeight() - 6) / 4);
 
-        slotBox.setBounds (stack.removeFromTop (cellHeight));
+        {
+            auto tabs = stack.removeFromTop (cellHeight);
+
+            for (auto& button : slotButtons)
+                button.setBounds (tabs.removeFromLeft (tabs.getWidth() / juce::jmax (1,
+                    (int) slotButtons.size())).reduced (1, 0));
+        }
+
         stack.removeFromTop (2);
         speedBox.setBounds (stack.removeFromTop (cellHeight));
         stack.removeFromTop (2);
@@ -545,7 +595,7 @@ void AutomationLaneComponent::paint (juce::Graphics& g)
     g.setColour (juce::Colour (0xff101317));
     g.fillRoundedRectangle (area, 3.0f);
 
-    if (current.speed == LaneSpeed::off)
+    if (! current.enabled)
     {
         g.setColour (theme::textDim);
         g.setFont (theme::font (10.0f));
@@ -590,6 +640,15 @@ void AutomationLaneComponent::paint (juce::Graphics& g)
 
         g.setColour (i == draggedPoint ? theme::accent : theme::text);
         g.fillEllipse (x - 3.5f, y - 3.5f, 7.0f, 7.0f);
+    }
+
+    // ---- Playhead ------------------------------------------------------------
+    {
+        const float x = area.getX()
+                          + processor.getAutomationPhase (trackIndex, slot) * area.getWidth();
+
+        g.setColour (theme::text.withAlpha (0.7f));
+        g.fillRect (juce::Rectangle<float> (x - 1.0f, area.getY(), 2.0f, area.getHeight()));
     }
 }
 

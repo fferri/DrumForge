@@ -153,6 +153,14 @@ void DrumKitProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
                 triggerTrackInternal (t, 1.0f);
 
             sequenceOffsets[(size_t) t] = output.offsets[(size_t) t];
+
+            triggerPhase[(size_t) t].store (output.triggerPhase[(size_t) t],
+                                            std::memory_order_relaxed);
+
+            for (int slot = 0; slot < kMaxAutomationLanes; ++slot)
+                automationPhase[(size_t) t][(size_t) slot].store (
+                    output.automationPhase[(size_t) t][(size_t) slot],
+                    std::memory_order_relaxed);
         }
     }
 

@@ -11,7 +11,6 @@ float laneSpeedMultiplier (LaneSpeed speed) noexcept
 {
     switch (speed)
     {
-        case LaneSpeed::off:      return 0.0f;
         case LaneSpeed::xEighth:  return 0.125f;
         case LaneSpeed::xQuarter: return 0.25f;
         case LaneSpeed::xThird:   return 1.0f / 3.0f;
@@ -24,22 +23,20 @@ float laneSpeedMultiplier (LaneSpeed speed) noexcept
         case LaneSpeed::xEight:   return 8.0f;
     }
 
-    return 0.0f;
+    return 1.0f;
 }
 
 float laneSpeedInBeats (LaneSpeed speed) noexcept
 {
     // A step is a 1/16 note (a quarter of a beat) divided by the multiplier, so a larger
     // multiplier gives a shorter step. Zero means stopped, not infinitely fast.
-    const float multiplier = laneSpeedMultiplier (speed);
-    return multiplier <= 0.0f ? 0.0f : 0.25f / multiplier;
+    return 0.25f / laneSpeedMultiplier (speed);
 }
 
 const char* laneSpeedName (LaneSpeed speed) noexcept
 {
     switch (speed)
     {
-        case LaneSpeed::off:      return "Off";
         case LaneSpeed::xEighth:  return "x1/8";
         case LaneSpeed::xQuarter: return "x1/4";
         case LaneSpeed::xThird:   return "x1/3";
@@ -52,7 +49,7 @@ const char* laneSpeedName (LaneSpeed speed) noexcept
         case LaneSpeed::xEight:   return "x8";
     }
 
-    return "Off";
+    return "x1";
 }
 
 const char* triggerModeName (TriggerMode mode) noexcept
@@ -192,6 +189,7 @@ void SequencerTransport::advance (const SequencerState& state, double ppqStart, 
         for (const auto& lane : state.automation[(size_t) t])
         {
             const double beatsPerStep = (double) laneSpeedInBeats (lane.speed);
+            const int slot = (int) (&lane - state.automation[(size_t) t].data());
 
             if (beatsPerStep <= 0.0 || lane.length <= 0)
                 continue;
@@ -199,6 +197,11 @@ void SequencerTransport::advance (const SequencerState& state, double ppqStart, 
             const double steps = ppqStart / beatsPerStep;
             const double cycle = steps / (double) lane.length;
             const float phase = (float) (cycle - std::floor (cycle));
+
+            out.automationPhase[(size_t) t][(size_t) slot] = (float) phase;
+
+            if (! lane.enabled)
+                continue;
 
             if (juce::isPositiveAndBelow (lane.target, kNumModTargets))
                 out.offsets[(size_t) t][(size_t) lane.target]
@@ -212,7 +215,7 @@ void SequencerTransport::advance (const SequencerState& state, double ppqStart, 
         const auto& lane = state.triggers[(size_t) t];
         const double beatsPerStep = (double) laneSpeedInBeats (lane.speed);
 
-        if (! playing || beatsPerStep <= 0.0 || lane.length <= 0)
+        if (beatsPerStep <= 0.0 || lane.length <= 0)
         {
             primed[(size_t) t] = false;
             continue;
@@ -220,6 +223,19 @@ void SequencerTransport::advance (const SequencerState& state, double ppqStart, 
 
         const double stepAtStart = ppqStart / beatsPerStep;
         const long long currentStep = (long long) std::floor (stepAtStart);
+
+        // The playhead position is reported whether or not the lane is enabled or the
+        // transport is running, so the editor can show where the cycle sits.
+        {
+            const double cycle = stepAtStart / (double) lane.length;
+            out.triggerPhase[(size_t) t] = (float) (cycle - std::floor (cycle));
+        }
+
+        if (! playing || ! lane.enabled)
+        {
+            primed[(size_t) t] = false;
+            continue;
+        }
 
         if (! primed[(size_t) t])
         {

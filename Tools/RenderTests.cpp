@@ -1602,7 +1602,8 @@ void testSequencerCore()
     check (std::abs (laneSpeedInBeats (LaneSpeed::xEighth) - 2.0f) < 1.0e-6f, "x1/8 is a 1/2");
     check (laneSpeedInBeats (LaneSpeed::xEight) < laneSpeedInBeats (LaneSpeed::xEighth),
            "a bigger multiplier is a shorter step");
-    check (laneSpeedInBeats (LaneSpeed::off) == 0.0f, "speed 0 is a stopped lane, not an error");
+    check (std::abs (laneSpeedInBeats (LaneSpeed::xOne) - 0.25f) < 1.0e-6f,
+           "and speed always means speed - there is no hidden off value");
 
     // ---- Euclidean ----
     {
@@ -1644,8 +1645,8 @@ void testSequencerCore()
         check (plain != shifted, "and the rotation actually changes where the hits land");
     }
 
-    check (! TriggerLane().isStepOn (0) || TriggerLane().speed == LaneSpeed::off,
-           "a new trigger lane starts stopped");
+    check (! TriggerLane().enabled, "a new trigger lane starts disabled");
+    check (TriggerLane().speed == LaneSpeed::xOne, "and its speed defaults to x1");
 
     // ---- breakpoint envelope ----
     {
@@ -1664,6 +1665,7 @@ void testSequencerCore()
     {
         SequencerState state;
         state.triggers[0].mode = TriggerMode::grid;
+        state.triggers[0].enabled = true;
         state.triggers[0].length = 4;
         state.triggers[0].speed = LaneSpeed::xQuarter;   // one beat per step
         state.triggers[0].steps = {};
@@ -1690,11 +1692,12 @@ void testSequencerCore()
         check (! output.trigger[0], "a stopped transport fires nothing");
     }
 
-    // ---- speed 0 disables a lane ----
+    // ---- the enable switch, not the speed, decides whether a lane plays ----
     {
         SequencerState state;
         state.triggers[0].length = 4;
-        state.triggers[0].speed = LaneSpeed::off;
+        state.triggers[0].speed = LaneSpeed::xQuarter;
+        state.triggers[0].enabled = false;
 
         for (int i = 0; i < 4; ++i)
             state.triggers[0].steps[(size_t) i] = true;
@@ -1709,7 +1712,7 @@ void testSequencerCore()
             fired = fired || output.trigger[0];
         }
 
-        check (! fired, "a lane at speed 0 never fires");
+        check (! fired, "a disabled lane never fires, whatever its speed");
     }
 
     // ---- polymeter: different lengths, same speed ----
@@ -1719,6 +1722,7 @@ void testSequencerCore()
         for (int t = 0; t < 2; ++t)
         {
             state.triggers[(size_t) t].speed = LaneSpeed::xQuarter;
+            state.triggers[(size_t) t].enabled = true;
             state.triggers[(size_t) t].length = t == 0 ? 3 : 4;
             state.triggers[(size_t) t].steps = {};
 
@@ -1748,8 +1752,9 @@ void testSequencerCore()
     // ---- automation is independent of the trigger lane ----
     {
         SequencerState state;
-        state.triggers[0].speed = LaneSpeed::off;          // no rhythm at all
+        state.triggers[0].enabled = false;                 // no rhythm at all
         state.automation[0][0].speed = LaneSpeed::xQuarter;
+        state.automation[0][0].enabled = true;
         state.automation[0][0].length = 4;
         state.automation[0][0].target = (int) ModTarget::level;
         state.automation[0][0].amount = 1.0f;
@@ -1777,6 +1782,7 @@ void testSequencerCore()
         {
             auto& lane = state.automation[0][(size_t) slot];
             lane.speed = LaneSpeed::xQuarter;
+            lane.enabled = true;
             lane.length = 4;
             lane.target = (int) ModTarget::level;
             lane.amount = 0.5f;
@@ -1825,6 +1831,7 @@ void testSequencerAudio()
 
     auto& state = processor.getSequencerState();
     state.triggers[0].mode = TriggerMode::grid;
+    state.triggers[0].enabled = true;
     state.triggers[0].speed = LaneSpeed::xOne;     // a 1/16, a quarter of a beat
     state.triggers[0].length = 4;
 
@@ -1861,7 +1868,7 @@ void testSequencerAudio()
            juce::String (loudest));
 
     // Let it decay before checking that a stopped transport is silent.
-    state.triggers[0].speed = LaneSpeed::off;
+    state.triggers[0].enabled = false;
     playHead.playing = false;
     playHead.ppq += 1.0;
 
@@ -1881,6 +1888,7 @@ void testSequencerAudio()
     // An automation lane moves the parameter the next hit is built from.
     {
         auto& lane = state.automation[0][0];
+        lane.enabled = true;
         lane.speed = LaneSpeed::xOne;
         lane.length = 2;
         lane.target = (int) ModTarget::level;
@@ -1889,6 +1897,7 @@ void testSequencerAudio()
         lane.points[0] = { 0.0f, -1.0f };
         lane.points[1] = { 1.0f, -1.0f };   // pinned quiet
 
+        state.triggers[0].enabled = true;
         state.triggers[0].speed = LaneSpeed::xOne;
         playHead.playing = true;
         playHead.ppq = 0.0;
