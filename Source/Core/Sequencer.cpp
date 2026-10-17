@@ -89,7 +89,7 @@ void TriggerLane::setDefaultsFor (TriggerMode newMode) noexcept
     {
         // Empty rather than a starter pattern: a lane that plays something you did not ask
         // for is harder to reason about than one that is obviously silent.
-        steps.fill (false);
+        steps.fill (GridStep {});
     }
     else
     {
@@ -114,7 +114,19 @@ bool TriggerLane::isStepOn (int step) const noexcept
     if (step >= length)
         return false;
 
-    return steps[(size_t) step];
+    return steps[(size_t) step].on;
+}
+
+float TriggerLane::velocityForStep (int step) const noexcept
+{
+    if (! isStepOn (step))
+        return 0.0f;
+
+    const float velocity = mode == TriggerMode::euclidean
+                             ? 100.0f
+                             : steps[(size_t) juce::jlimit (0, kMaxLaneSteps - 1, step)].velocity;
+
+    return juce::jlimit (0.0f, 1.0f, velocity / 127.0f);
 }
 
 //==============================================================================
@@ -231,12 +243,16 @@ juce::ValueTree sequencerStateToValueTree (const SequencerState& state)
 
         // A 64-character bit string is compact and reads in a diff, which the XML of a
         // project file often gets eyeballed in.
-        juce::String bits;
+        juce::String bits, velocities;
 
         for (int i = 0; i < kMaxLaneSteps; ++i)
-            bits << (trigger.steps[(size_t) i] ? '1' : '0');
+        {
+            bits << (trigger.steps[(size_t) i].on ? '1' : '0');
+            velocities << (i > 0 ? "," : "") << juce::roundToInt (trigger.steps[(size_t) i].velocity);
+        }
 
         track.setProperty ("steps", bits, nullptr);
+        track.setProperty ("velocities", velocities, nullptr);
 
         for (const auto& automation : state.automation[(size_t) t])
         {
@@ -283,9 +299,19 @@ void sequencerStateFromValueTree (const juce::ValueTree& tree, SequencerState& s
                                        (int) track.getProperty ("offset", 0));
 
         const auto bits = track.getProperty ("steps").toString();
+        juce::StringArray storedVelocities;
+        storedVelocities.addTokens (track.getProperty ("velocities").toString(), ",", "");
 
         for (int i = 0; i < kMaxLaneSteps; ++i)
-            trigger.steps[(size_t) i] = i < bits.length() && bits[i] == '1';
+        {
+            trigger.steps[(size_t) i].on = i < bits.length() && bits[i] == '1';
+
+            // A session saved before velocities existed supplies none, so every step keeps
+            // the default rather than being zeroed.
+            if (i < storedVelocities.size())
+                trigger.steps[(size_t) i].velocity = juce::jlimit (1.0f, 127.0f,
+                    (float) storedVelocities[i].getIntValue());
+        }
 
         auto automationChildren = 0;
 
@@ -404,7 +430,10 @@ void SequencerTransport::advance (const SequencerState& state, double ppqStart, 
             const int wrapped = (int) (((currentStep % lane.length) + lane.length) % lane.length);
 
             if (lane.isStepOn (wrapped))
+            {
                 out.trigger[(size_t) t] = true;
+                out.triggerVelocity[(size_t) t] = lane.velocityForStep (wrapped);
+            }
         }
     }
 }

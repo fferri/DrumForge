@@ -55,6 +55,8 @@ public:
     void resized() override;
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
+    void mouseDrag (const juce::MouseEvent&) override;
+    void mouseUp (const juce::MouseEvent&) override;
 
     void refreshFromProcessor();
 
@@ -67,6 +69,7 @@ private:
     void syncControls();
     void clampEuclidean();
     int stepIndexAt (juce::Point<int>) const noexcept;
+    float velocityFromY (int y) const noexcept;
 
     DrumKitProcessor& processor;
     const int trackIndex;
@@ -78,6 +81,12 @@ private:
     ValueStepper offsetStepper { "Offset", -kMaxLaneSteps, kMaxLaneSteps };
 
     juce::Rectangle<int> identityArea, controlsArea, euclideanArea, editorBounds;
+
+    /** The step being clicked, so a click can toggle and a vertical drag can set velocity
+        without the two fighting each other. */
+    int activeStep = -1;
+    int dragStartY = 0;
+    bool dragged = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SequencerLaneComponent)
 };

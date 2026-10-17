@@ -328,6 +328,15 @@ Each lane draws a **playhead**: a line that walks across the steps as the cycle 
 can see at a glance where every lane is, and how lanes of different lengths drift against
 each other.
 
+Each grid step carries its **own velocity**. Click a step to switch it on or off; drag it up
+or down to set how hard it fires. The step is drawn as an outline when it is enabled, with a
+bar filling upward from the bottom to show its velocity, so a row of steps reads as a picture
+of the dynamics.
+
+New steps default to **100**, which is the value most controllers send and the point the
+velocity curve treats as neutral. Dragging onto an empty step switches it on at that velocity,
+so you can play a pattern in rather than toggling first.
+
 In **Euclidean** mode the row also shows:
 
 - **Trigs** — how many pulses to spread across the steps, 0 to the length.

@@ -225,6 +225,17 @@ int SequencerLaneComponent::stepIndexAt (juce::Point<int> position) const noexce
     return juce::jlimit (0, columns - 1, (int) std::floor (relative * (float) columns));
 }
 
+float SequencerLaneComponent::velocityFromY (int y) const noexcept
+{
+    if (editorBounds.isEmpty())
+        return 100.0f;
+
+    const float relative = 1.0f - (float) (y - editorBounds.getY())
+                                    / (float) juce::jmax (1, editorBounds.getHeight());
+
+    return juce::jlimit (1.0f, 127.0f, std::round (relative * 127.0f));
+}
+
 void SequencerLaneComponent::mouseDown (const juce::MouseEvent& event)
 {
     auto& current = lane();
@@ -234,11 +245,56 @@ void SequencerLaneComponent::mouseDown (const juce::MouseEvent& event)
 
     const int step = stepIndexAt (event.getPosition());
 
-    if (juce::isPositiveAndBelow (step, current.length))
+    if (! juce::isPositiveAndBelow (step, current.length))
+        return;
+
+    // A click toggles; a vertical drag sets velocity. Which one it was is only known on
+    // release, so nothing is committed yet.
+    activeStep = step;
+    dragStartY = event.y;
+    dragged = false;
+}
+
+void SequencerLaneComponent::mouseDrag (const juce::MouseEvent& event)
+{
+    auto& current = lane();
+
+    if (activeStep < 0 || activeStep >= current.length || current.mode != TriggerMode::grid)
+        return;
+
+    if (! dragged && std::abs (event.y - dragStartY) < 3)
+        return;      // still a click, not yet a drag
+
+    dragged = true;
+
+    // Dragging a step up or down turns it on: drawing a velocity into an empty step is how
+    // you program a pattern, and an off step has no velocity worth setting.
+    current.steps[(size_t) activeStep].on = true;
+    current.steps[(size_t) activeStep].velocity = velocityFromY (event.y);
+
+    repaint (editorBounds);
+}
+
+void SequencerLaneComponent::mouseUp (const juce::MouseEvent&)
+{
+    auto& current = lane();
+
+    if (activeStep >= 0 && activeStep < current.length && ! dragged
+         && current.mode == TriggerMode::grid)
     {
-        current.steps[(size_t) step] = ! current.steps[(size_t) step];
+        auto& step = current.steps[(size_t) activeStep];
+        step.on = ! step.on;
+
+        // Re-enabling a step without touching its velocity should give it the default
+        // rather than whatever it was left at before it was switched off.
+        if (step.on && step.velocity < 1.0f)
+            step.velocity = 100.0f;
+
         repaint (editorBounds);
     }
+
+    activeStep = -1;
+    dragged = false;
 }
 
 void SequencerLaneComponent::paint (juce::Graphics& g)
@@ -283,17 +339,47 @@ void SequencerLaneComponent::paint (juce::Graphics& g)
 
     for (int step = 0; step < columns; ++step)
     {
-        const bool on = current.isStepOn (step);
+        const auto cell = juce::Rectangle<float> (grid.getX() + cellWidth * (float) step,
+                                                  grid.getY(),
+                                                  cellWidth,
+                                                  grid.getHeight()).reduced (inset);
 
-        g.setColour (running && on
-                        ? theme::accent
-                        : (step % 4 == 0 ? theme::panelAlt.brighter (0.25f) : theme::panelAlt));
+        // The cell's background is only a beat marker; the state is drawn inside it.
+        g.setColour (step % 4 == 0 ? theme::panelAlt.brighter (0.22f) : theme::panelAlt);
+        g.fillRoundedRectangle (cell, 2.0f);
 
-        g.fillRoundedRectangle (grid.getX() + cellWidth * (float) step + inset,
-                                grid.getY() + inset,
-                                cellWidth - inset * 2.0f,
-                                grid.getHeight() - inset * 2.0f,
-                                1.5f);
+        if (current.mode == TriggerMode::euclidean)
+        {
+            if (running && current.isStepOn (step))
+            {
+                g.setColour (theme::accent);
+                g.fillRoundedRectangle (cell.reduced (0.5f), 2.0f);
+            }
+
+            continue;
+        }
+
+        const auto& gridStep = current.steps[(size_t) step];
+        const bool on = running && gridStep.on;
+
+        // Velocity as a bar growing upwards from the bottom, so a glance down the row is a
+        // picture of the dynamics.
+        if (on)
+        {
+            const float amount = juce::jlimit (0.0f, 1.0f, gridStep.velocity / 127.0f);
+            const float barHeight = juce::jmax (1.5f, (cell.getHeight() - 2.0f) * amount);
+
+            auto bar = cell.reduced (1.0f);
+            bar = bar.withTrimmedTop (bar.getHeight() - barHeight);
+
+            g.setColour (theme::accent.withAlpha (0.9f));
+            g.fillRect (bar);
+        }
+
+        // A separate outline, so "this step fires" is legible even when its velocity is low
+        // and the bar is only a sliver.
+        g.setColour (on ? theme::accent : theme::outline);
+        g.drawRoundedRectangle (cell.reduced (0.5f), 2.0f, on ? 1.6f : 1.0f);
     }
 
     // ---- Playhead ------------------------------------------------------------

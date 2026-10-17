@@ -1650,13 +1650,41 @@ void testSequencerCore()
         bool anyStepOn = false;
 
         for (int i = 0; i < kMaxLaneSteps; ++i)
-            anyStepOn = anyStepOn || fresh.steps[(size_t) i];
+            anyStepOn = anyStepOn || fresh.steps[(size_t) i].on;
 
         check (! anyStepOn, "a new grid lane starts empty, not with a starter pattern");
     }
 
     check (TriggerLane().enabled, "a new trigger lane starts enabled");
     check (TriggerLane().speed == LaneSpeed::xOne, "and its speed defaults to x1");
+
+    // ---- per-step velocity ----
+    {
+        check (std::abs (GridStep {}.velocity - 100.0f) < 1.0e-6f,
+               "a new step defaults to velocity 100");
+
+        TriggerLane lane;
+        lane.mode = TriggerMode::grid;
+        lane.length = 4;
+        lane.steps[0].on = true;
+        lane.steps[0].velocity = 100.0f;
+
+        check (std::abs (lane.velocityForStep (0) - 100.0f / 127.0f) < 1.0e-5f,
+               "a step at velocity 100 fires at 100/127",
+               juce::String (lane.velocityForStep (0)));
+        check (lane.velocityForStep (1) == 0.0f, "an off step contributes no velocity");
+
+        lane.steps[0].velocity = 30.0f;
+        check (lane.velocityForStep (0) < 100.0f / 127.0f, "a quieter step fires quieter");
+
+        // Euclidean steps are generated rather than drawn, so they share one velocity.
+        lane.mode = TriggerMode::euclidean;
+        lane.length = 8;
+        lane.trigs = 3;
+        check (std::abs (lane.velocityForStep (0) - 100.0f / 127.0f) < 1.0e-5f,
+               "Euclidean steps fire at the default velocity",
+               juce::String (lane.velocityForStep (0)));
+    }
 
     // ---- breakpoint envelope ----
     {
@@ -1681,7 +1709,7 @@ void testSequencerCore()
         state.triggers[0].steps = {};
 
         for (int i = 0; i < 4; ++i)
-            state.triggers[0].steps[(size_t) i] = true;
+            state.triggers[0].steps[(size_t) i].on = true;
 
         SequencerTransport transport;
         SequencerOutput output;
@@ -1710,7 +1738,7 @@ void testSequencerCore()
         state.triggers[0].enabled = false;
 
         for (int i = 0; i < 4; ++i)
-            state.triggers[0].steps[(size_t) i] = true;
+            state.triggers[0].steps[(size_t) i].on = true;
 
         SequencerTransport transport;
         SequencerOutput output;
@@ -1737,7 +1765,7 @@ void testSequencerCore()
             state.triggers[(size_t) t].steps = {};
 
             for (int i = 0; i < kMaxLaneSteps; ++i)
-                state.triggers[(size_t) t].steps[(size_t) i] = true;
+                state.triggers[(size_t) t].steps[(size_t) i].on = true;
         }
 
         SequencerTransport transport;
@@ -1846,7 +1874,7 @@ void testSequencerAudio()
     state.triggers[0].length = 4;
 
     for (int i = 0; i < 4; ++i)
-        state.triggers[0].steps[(size_t) i] = true;
+        state.triggers[0].steps[(size_t) i].on = true;
 
     TestPlayHead playHead;
     processor.setPlayHead (&playHead);
@@ -1968,7 +1996,9 @@ void testSequencerPersistence()
     lanes.triggers[1].length = 5;
 
     for (int i = 0; i < 5; ++i)
-        lanes.triggers[1].steps[(size_t) i] = (i % 2) == 0;
+        lanes.triggers[1].steps[(size_t) i].on = (i % 2) == 0;
+
+    lanes.triggers[1].steps[2].velocity = 64.0f;
 
     lanes.automation[0][0].enabled = true;
     lanes.automation[0][0].speed = LaneSpeed::xQuarter;
@@ -2001,9 +2031,14 @@ void testSequencerPersistence()
     bool stepsMatch = true;
 
     for (int i = 0; i < 5; ++i)
-        stepsMatch = stepsMatch && back.triggers[1].steps[(size_t) i] == ((i % 2) == 0);
+        stepsMatch = stepsMatch && back.triggers[1].steps[(size_t) i].on == ((i % 2) == 0);
 
     check (stepsMatch, "and its steps");
+
+    // Per-step velocity travels with the pattern too.
+    check (std::abs (back.triggers[1].steps[2].velocity - 64.0f) < 1.0e-3f,
+           "a step's velocity comes back with it",
+           juce::String (back.triggers[1].steps[2].velocity));
 
     const auto& automation = back.automation[0][0];
 

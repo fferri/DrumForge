@@ -150,7 +150,7 @@ void DrumKitProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
         for (int t = 0; t < kNumTracks; ++t)
         {
             if (output.trigger[(size_t) t])
-                triggerTrackInternal (t, 1.0f);
+                triggerTrackInternal (t, output.triggerVelocity[(size_t) t]);
 
             sequenceOffsets[(size_t) t] = output.offsets[(size_t) t];
 

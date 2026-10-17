@@ -75,6 +75,21 @@ struct ModPoint
 };
 
 //==============================================================================
+/** One step of a grid pattern.
+
+    Enabled and velocity are separate: the outline says whether the step fires, the filled
+    bar says how hard. A step can be enabled and quiet without being off.
+*/
+struct GridStep
+{
+    bool on = false;
+
+    /** 1..127. 100 is the default, which is what most controllers send and what the
+        velocity-modulation curve treats as its neutral point. */
+    float velocity = 100.0f;
+};
+
+//==============================================================================
 /** The trigger sequencer for one track.
 
     Every track has exactly one, and it is either a grid or a Euclidean pattern. Its
@@ -91,7 +106,7 @@ struct TriggerLane
     int length = 16;
 
     /** Grid pattern; only the first `length` entries are used. */
-    std::array<bool, kMaxLaneSteps> steps {};
+    std::array<GridStep, kMaxLaneSteps> steps {};
 
     /** Euclidean: how many pulses, and where the pattern starts. A negative offset walks the
         pattern backwards, which is the quickest way to get a different feel out of the same
@@ -106,6 +121,10 @@ struct TriggerLane
 
     /** Is this step on? Handles the wrap and the Euclidean offset. */
     bool isStepOn (int step) const noexcept;
+
+    /** How hard this step fires, 0..1. Euclidean steps share one velocity, because they
+        are generated rather than drawn. */
+    float velocityForStep (int step) const noexcept;
 };
 
 /** Evenly-spread rhythm. This is the closed form that agrees with Bjorklund for the
@@ -157,6 +176,9 @@ struct SequencerOutput
     /** Summed automation offsets per track, in normalised parameter space, -1..+1. Lanes
         aimed at the same parameter add up. */
     std::array<std::array<float, (size_t) kNumModTargets>, (size_t) kNumTracks> offsets {};
+
+    /** How hard each track's trigger fires this block, 0..1. */
+    std::array<float, (size_t) kNumTracks> triggerVelocity {};
 
     /** Where each lane is in its cycle, 0..1. The editor draws a playhead from this. */
     std::array<float, (size_t) kNumTracks> triggerPhase {};
