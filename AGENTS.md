@@ -1,4 +1,4 @@
-# Working on DrumForge
+# Working on InfinityDrum
 
 Practical guidance for changing this repository. Written for AI agents, but it applies
 equally to people.
@@ -9,7 +9,7 @@ equally to people.
 
 ### 1. Dependencies must be AGPLv3-compatible
 
-DrumForge is released under the **AGPLv3** — see [LICENSE](LICENSE). Everything it links,
+InfinityDrum is released under the **AGPLv3** — see [LICENSE](LICENSE). Everything it links,
 bundles or vendors must be compatible with that licence. JUCE is dual-licensed and this
 project uses the AGPLv3 arm of it.
 
@@ -40,8 +40,8 @@ A change is not finished until it has been verified on the machine it runs on.
 
 - **New behaviour needs a new check.** Add it to `Tools/RenderTests.cpp` unless it is
   something only a human eye can judge.
-- **Run the suite before claiming anything works.** `./build/DrumForgeTests_artefacts/Release/DrumForgeTests`
-  must pass, and `DrumForgeHostTest` must pass if you touched anything the plugin wrapper sees.
+- **Run the suite before claiming anything works.** `./build/InfinityDrumTests_artefacts/Release/InfinityDrumTests`
+  must pass, and `InfinityDrumHostTest` must pass if you touched anything the plugin wrapper sees.
 - **Say which check covers it.** "Verified by X" is worth more than "should work".
 - **If it cannot be tested automatically, say so.** The editor's mouse gestures have no
   automated coverage; only the maths behind them does. Do not imply otherwise.
@@ -87,7 +87,7 @@ A change is not finished until it has been verified on the machine it runs on.
 | Path | What lives there |
 |---|---|
 | `kits/` | The kit definitions, as editable `.dfkit` XML. **The source of truth for kit content** |
-| `docs/` | The UI screenshot used in the README, `drumforge-ui.png` |
+| `docs/` | The UI screenshot used in the README, `infinitydrum-ui.png` |
 | `.github/workflows/` | CI: builds both platforms, tests, packages, releases |
 | `README.md` | For users: installing, using, licensing, supporting |
 | `ARCHITECTURE.md` | For developers: how it works and why it is built this way |
@@ -98,7 +98,7 @@ A change is not finished until it has been verified on the machine it runs on.
 | Path | What it is |
 |---|---|
 | `build/` | Build output. Delete it freely; a clean build is the honest test |
-| `renders/` | WAVs written by `DrumForgeRender` and the kit tools |
+| `renders/` | WAVs written by `InfinityDrumRender` and the kit tools |
 | `reference_samples/` | Third-party recordings. Read golden rule 2 |
 | `JUCE/` | The framework, cloned separately. Not vendored |
 
@@ -106,7 +106,7 @@ A change is not finished until it has been verified on the machine it runs on.
 
 ## Tasks
 
-**Work is tracked in this repository and nowhere else: <https://github.com/fferri/DrumForge>**
+**Work is tracked in this repository and nowhere else: <https://github.com/fferri/InfinityDrum>**
 
 Not in a chat transcript, not in a scratch file outside the repo, not only in a commit
 message. If a piece of work matters, it belongs in the repository's issue tracker where it
@@ -162,7 +162,7 @@ cmake --build build
 
 For a universal macOS binary add `-DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"`.
 
-The VST3 bundle lands at `build/DrumForge_artefacts/Release/VST3/DrumForge.vst3`.
+The VST3 bundle lands at `build/InfinityDrum_artefacts/Release/VST3/InfinityDrum.vst3`.
 
 ---
 
@@ -172,16 +172,16 @@ The VST3 bundle lands at `build/DrumForge_artefacts/Release/VST3/DrumForge.vst3`
 cmake --build build
 
 # The main suite: 491 checks. Drives the processor headlessly.
-./build/DrumForgeTests_artefacts/Release/DrumForgeTests
+./build/InfinityDrumTests_artefacts/Release/InfinityDrumTests
 
 # End-to-end through the real VST3 hosting code: 23 checks.
-./build/DrumForgeHostTest_artefacts/Release/DrumForgeHostTest.app/Contents/MacOS/DrumForgeHostTest
+./build/InfinityDrumHostTest_artefacts/Release/InfinityDrumHostTest.app/Contents/MacOS/InfinityDrumHostTest
 
 # Renders the editor to a PNG. The only way to check that the band and dot actually draw.
-./build/DrumForgeScreenshot_artefacts/Release/DrumForgeScreenshot docs/drumforge-ui.png
+./build/InfinityDrumScreenshot_artefacts/Release/InfinityDrumScreenshot docs/infinitydrum-ui.png
 
 # Writes WAVs you can listen to, one per engine and one per factory kit.
-./build/DrumForgeRender_artefacts/Release/DrumForgeRender renders
+./build/InfinityDrumRender_artefacts/Release/InfinityDrumRender renders
 ```
 
 All of them exit non-zero on failure and are safe to run in CI. What each one covers is
@@ -201,8 +201,8 @@ the test suite, and attaches the packages to the run:
 
 | Platform | Artifact |
 |---|---|
-| macOS | `DrumForge-macOS-universal.zip` — Intel and Apple Silicon in one binary, plus the install script |
-| Windows | `DrumForge-Windows-x64.zip` |
+| macOS | `InfinityDrum-macOS-universal.zip` — Intel and Apple Silicon in one binary, plus the install script |
+| Windows | `InfinityDrum-Windows-x64.zip` |
 
 Pushing a tag starting with `v` turns a build into a release, with both packages attached
 and notes generated from the commits:

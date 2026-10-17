@@ -3,7 +3,7 @@
 namespace df
 {
 
-DrumForgeLookAndFeel::DrumForgeLookAndFeel()
+InfinityDrumLookAndFeel::InfinityDrumLookAndFeel()
 {
     setColour (juce::ResizableWindow::backgroundColourId, theme::background);
 
@@ -36,22 +36,22 @@ DrumForgeLookAndFeel::DrumForgeLookAndFeel()
     setColour (juce::TooltipWindow::outlineColourId, theme::outline);
 }
 
-juce::Font DrumForgeLookAndFeel::getComboBoxFont (juce::ComboBox& box)
+juce::Font InfinityDrumLookAndFeel::getComboBoxFont (juce::ComboBox& box)
 {
     return theme::font (juce::jlimit (9.0f, 13.0f, (float) box.getHeight() * 0.55f));
 }
 
-juce::Font DrumForgeLookAndFeel::getLabelFont (juce::Label& label)
+juce::Font InfinityDrumLookAndFeel::getLabelFont (juce::Label& label)
 {
     return theme::font (juce::jlimit (9.0f, 14.0f, (float) label.getHeight() * 0.7f));
 }
 
-juce::Font DrumForgeLookAndFeel::getPopupMenuFont()
+juce::Font InfinityDrumLookAndFeel::getPopupMenuFont()
 {
     return theme::font (13.0f);
 }
 
-juce::Font DrumForgeLookAndFeel::getTextButtonFont (juce::TextButton&, int buttonHeight)
+juce::Font InfinityDrumLookAndFeel::getTextButtonFont (juce::TextButton&, int buttonHeight)
 {
     return theme::font (juce::jlimit (9.0f, 13.0f, (float) buttonHeight * 0.5f), juce::Font::bold);
 }

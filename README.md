@@ -1,4 +1,4 @@
-# DrumForge
+# InfinityDrum
 
 An 8-track drum and percussion **VST3 instrument**. Every track can load any of **nine
 synthesis engines**, covering conventional drum synthesis through to inharmonic metal,
@@ -8,7 +8,7 @@ Tracks are triggered over MIDI using either the General MIDI drum map or an Artu
 BeatStep Pro's note numbers. Each track has its own distortion curve, drive, tune, pan,
 level and reverb send, and every continuous parameter can be varied by velocity.
 
-![DrumForge](docs/drumforge-ui.png)
+![InfinityDrum](docs/infinitydrum-ui.png)
 
 *Knobs with a velocity depth dialled in show a coloured band for the range velocity can
 reach, and a dot for where the last hit actually landed.*
@@ -17,19 +17,19 @@ reach, and a dot for where the last hit actually landed.*
 
 ## Installing
 
-Prebuilt packages are on the [releases page](https://github.com/fferri/DrumForge/releases).
+Prebuilt packages are on the [releases page](https://github.com/fferri/InfinityDrum/releases).
 Each one is built and tested on its own platform before it is published.
 
 ### macOS
 
-Download `DrumForge-macOS-universal.zip`, unzip it, and run the installer that sits next to
+Download `InfinityDrum-macOS-universal.zip`, unzip it, and run the installer that sits next to
 the plugin:
 
 ```sh
 ./install-macos.sh
 ```
 
-That copies `DrumForge.vst3` into `~/Library/Audio/Plug-Ins/VST3` and clears the
+That copies `InfinityDrum.vst3` into `~/Library/Audio/Plug-Ins/VST3` and clears the
 **quarantine** flag. The flag is the part that matters: a browser download sets it, and
 Gatekeeper refuses to load quarantined code, so without this step most DAWs will not see
 the plugin at all.
@@ -40,7 +40,7 @@ Pass a path to install somewhere else, or do it by hand instead:
 ./install-macos.sh /Library/Audio/Plug-Ins/VST3
 
 # or, by hand:
-xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/DrumForge.vst3
+xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/InfinityDrum.vst3
 ```
 
 One binary covers both Intel and Apple Silicon. It is not notarised — that needs a paid
@@ -49,7 +49,7 @@ Downloading from a terminal (`curl`, `gh release download`) sets no flag at all.
 
 ### Windows
 
-Download `DrumForge-Windows-x64.zip` and copy the `DrumForge.vst3` folder into your VST3
+Download `InfinityDrum-Windows-x64.zip` and copy the `InfinityDrum.vst3` folder into your VST3
 folder, normally:
 
 ```
@@ -225,7 +225,7 @@ alongside three originals: **Industrial** (the default), **Warehouse** and **Stu
 **Click the kit name** in the top bar, or open the main menu at the top right and choose
 **Kit**. Both give the same list: built-in kits and your own in one place.
 
-**Built-in kits are read-only and are not copied to disk**, so a later version of DrumForge
+**Built-in kits are read-only and are not copied to disk**, so a later version of InfinityDrum
 can improve them and you get the improvement automatically. Saving always makes a kit of
 your own: with a built-in kit loaded, Save pre-fills "<name> Copy", so turning a factory kit
 into an editable one is one click.
@@ -238,7 +238,7 @@ Your own kits are individual files, so they survive updates, can be backed up an
 handed to someone else:
 
 ```
-~/Library/DrumForge/Kits/*.dfkit
+~/Library/InfinityDrum/Kits/*.dfkit
 ```
 
 They are plain XML and can be edited by hand. Saving over an existing name replaces it, and
@@ -387,13 +387,13 @@ pattern is an arrangement. Loading someone's kit should not overwrite the groove
 
 ## Licensing
 
-DrumForge is released under the **GNU Affero General Public License v3.0** (AGPLv3).
+InfinityDrum is released under the **GNU Affero General Public License v3.0** (AGPLv3).
 
 The full licence text is in [LICENSE](LICENSE), and at
 <https://www.gnu.org/licenses/agpl-3.0.html>.
 
 The plugin links [JUCE](https://juce.com), which is itself dual-licensed under the AGPLv3
-or a commercial licence. Distributing DrumForge under the AGPLv3 satisfies JUCE's terms;
+or a commercial licence. Distributing InfinityDrum under the AGPLv3 satisfies JUCE's terms;
 shipping it as a closed-source product would require a commercial JUCE licence from Raw
 Material Software.
 
@@ -401,7 +401,7 @@ Material Software.
 
 ## Supporting this project
 
-DrumForge is a vibe-coded project. It was built by describing what it should do, and the
+InfinityDrum is a vibe-coded project. It was built by describing what it should do, and the
 code, the kit design and this documentation were produced through that process. That is
 enough to arrive at a usable instrument, but it is not a substitute for the judgement of
 people who make music with it.
@@ -414,4 +414,4 @@ fairly directly into more of the project:
 - **GitHub Sponsors** — <https://github.com/sponsors/fferri>
 
 Bug reports and feature requests are equally welcome and cost nothing. They are tracked in
-the [issue tracker](https://github.com/fferri/DrumForge/issues).
+the [issue tracker](https://github.com/fferri/InfinityDrum/issues).

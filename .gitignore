@@ -3,7 +3,7 @@ build/
 build-*/
 cmake-build-*/
 
-# Generated audio from DrumForgeRender
+# Generated audio from InfinityDrumRender
 renders/
 
 # Python bytecode from the kit design scripts

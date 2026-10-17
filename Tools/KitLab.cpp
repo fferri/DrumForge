@@ -1,5 +1,5 @@
 /*
-    DrumForgeKitLab - the kit design harness. Not shipped with the plugin.
+    InfinityDrumKitLab - the kit design harness. Not shipped with the plugin.
 
     Renders .dfkit files through a pattern matched to their intended lane, so a kit can be
     measured against the reference targets before anyone spends time listening to it.
@@ -12,8 +12,8 @@
     therefore gets a pattern whose density matches the genre.
 
     Usage:
-      DrumForgeKitLab export <directory>              write the factory kits out as .dfkit
-      DrumForgeKitLab render <kitDirectory> <outDir>  render every kit through its lane
+      InfinityDrumKitLab export <directory>              write the factory kits out as .dfkit
+      InfinityDrumKitLab render <kitDirectory> <outDir>  render every kit through its lane
 */
 
 #include <iostream>
@@ -375,9 +375,9 @@ int main (int argc, char** argv)
     if (arguments.size() < 3)
     {
         std::cout << "usage:\n"
-                     "  DrumForgeKitLab export <directory>\n"
-                     "  DrumForgeKitLab render <kitDirectory> <outputDirectory>\n"
-                     "  DrumForgeKitLab random <count> <lane> <outputDirectory>\n";
+                     "  InfinityDrumKitLab export <directory>\n"
+                     "  InfinityDrumKitLab render <kitDirectory> <outputDirectory>\n"
+                     "  InfinityDrumKitLab random <count> <lane> <outputDirectory>\n";
         return 1;
     }
 

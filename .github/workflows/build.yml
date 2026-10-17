@@ -56,7 +56,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          ./build/DrumForgeTests_artefacts/Release/DrumForgeTests > verify.log 2>&1
+          ./build/InfinityDrumTests_artefacts/Release/InfinityDrumTests > verify.log 2>&1
           status=$?
           set -e
           cat verify.log
@@ -81,20 +81,20 @@ jobs:
           # something the reader can act on rather than a folder to dig through. zip keeps
           # the executable bit, which matters for the script.
           stage=$(mktemp -d)
-          cp -R build/DrumForge_artefacts/Release/VST3/DrumForge.vst3 "$stage/"
+          cp -R build/InfinityDrum_artefacts/Release/VST3/InfinityDrum.vst3 "$stage/"
           cp scripts/install-macos.sh "$stage/"
           chmod +x "$stage/install-macos.sh"
 
-          out="$PWD/DrumForge-macOS-universal.zip"
-          ( cd "$stage" && zip -q -r -y "$out" DrumForge.vst3 install-macos.sh )
+          out="$PWD/InfinityDrum-macOS-universal.zip"
+          ( cd "$stage" && zip -q -r -y "$out" InfinityDrum.vst3 install-macos.sh )
           rm -rf "$stage"
 
-          unzip -l DrumForge-macOS-universal.zip
+          unzip -l InfinityDrum-macOS-universal.zip
 
       - uses: actions/upload-artifact@v4
         with:
-          name: DrumForge-macOS-universal
-          path: DrumForge-macOS-universal.zip
+          name: InfinityDrum-macOS-universal
+          path: InfinityDrum-macOS-universal.zip
           if-no-files-found: error
 
   #=============================================================================
@@ -130,7 +130,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          ./build/DrumForgeTests_artefacts/Release/DrumForgeTests.exe > verify.log 2>&1
+          ./build/InfinityDrumTests_artefacts/Release/InfinityDrumTests.exe > verify.log 2>&1
           status=$?
           set -e
           cat verify.log
@@ -152,13 +152,13 @@ jobs:
       - name: Package
         shell: pwsh
         run: >
-          7z a -tzip DrumForge-Windows-x64.zip
-          build\DrumForge_artefacts\Release\VST3\DrumForge.vst3
+          7z a -tzip InfinityDrum-Windows-x64.zip
+          build\InfinityDrum_artefacts\Release\VST3\InfinityDrum.vst3
 
       - uses: actions/upload-artifact@v4
         with:
-          name: DrumForge-Windows-x64
-          path: DrumForge-Windows-x64.zip
+          name: InfinityDrum-Windows-x64
+          path: InfinityDrum-Windows-x64.zip
           if-no-files-found: error
 
   #=============================================================================
@@ -200,7 +200,7 @@ jobs:
 
           if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
-              --title "DrumForge $GITHUB_REF_NAME" --generate-notes
+              --title "InfinityDrum $GITHUB_REF_NAME" --generate-notes
           fi
 
           gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber $assets

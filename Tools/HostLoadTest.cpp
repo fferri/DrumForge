@@ -1,7 +1,7 @@
 /*
-    DrumForge host-side load test.
+    InfinityDrum host-side load test.
 
-    Loads the built DrumForge.vst3 through JUCE's real VST3 hosting code - the same path
+    Loads the built InfinityDrum.vst3 through JUCE's real VST3 hosting code - the same path
     a DAW takes - and drives it as a plugin instance. This is the end-to-end check that
     the wrapper, bus layout, MIDI input, parameters and editor behave when the binary is
     loaded from disk rather than instantiated directly.
@@ -10,7 +10,7 @@
     message loop with [NSApp run], which only works once the app lifecycle has actually
     started. Plugin instantiation is asynchronous, so the checks run from a timer.
 
-    Usage: DrumForgeHostTest [pathToVst3]
+    Usage: InfinityDrumHostTest [pathToVst3]
     Exits non-zero on failure.
 */
 
@@ -48,7 +48,7 @@ class HostTestApplication final : public juce::JUCEApplication,
 public:
     HostTestApplication() = default;
 
-    const juce::String getApplicationName() override { return "DrumForgeHostTest"; }
+    const juce::String getApplicationName() override { return "InfinityDrumHostTest"; }
     const juce::String getApplicationVersion() override { return "1.0.0"; }
     bool moreThanOneInstanceAllowed() override { return true; }
 
@@ -59,9 +59,9 @@ public:
         pluginFile = commandLine.isNotEmpty()
             ? juce::File::getCurrentWorkingDirectory().getChildFile (commandLine)
             : juce::File::getCurrentWorkingDirectory()
-                  .getChildFile ("build/DrumForge_artefacts/Release/VST3/DrumForge.vst3");
+                  .getChildFile ("build/InfinityDrum_artefacts/Release/VST3/InfinityDrum.vst3");
 
-        std::cout << "DrumForge host load test\n"
+        std::cout << "InfinityDrum host load test\n"
                   << "========================\n"
                   << "plugin: " << pluginFile.getFullPathName().toStdString() << "\n\n";
 
@@ -94,7 +94,7 @@ public:
                   << "        isInstrument: " << (description.isInstrument ? "yes" : "no") << "\n"
                   << "        format      : " << description.pluginFormatName.toStdString() << "\n\n";
 
-        check (description.name == "DrumForge", "plugin name is DrumForge", description.name);
+        check (description.name == "InfinityDrum", "plugin name is InfinityDrum", description.name);
         check (description.isInstrument, "advertised as an instrument");
         check (description.pluginFormatName == "VST3", "format is VST3", description.pluginFormatName);
 

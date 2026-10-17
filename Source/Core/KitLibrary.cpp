@@ -196,7 +196,7 @@ bool kitFromXml (const juce::XmlElement& xml, KitData& destination)
 juce::File KitLibrary::defaultUserDirectory()
 {
     return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
-               .getChildFile ("DrumForge")
+               .getChildFile ("InfinityDrum")
                .getChildFile ("Kits");
 }
 

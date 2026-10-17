@@ -24,13 +24,43 @@ void setSettingsDirectoryOverride (juce::File directory)
     overrideDirectory() = std::move (directory);
 }
 
+namespace
+{
+    /** Carries a pre-rename installation over the first time the new name is used.
+
+        The product used to be called DrumForge, and its kits and settings lived under that
+        name. Without this, renaming the plugin would silently orphan every kit the user had
+        saved. Copy rather than move: if anything is wrong with the migration, the original
+        is still there. Runs once per process, and never when a directory is overridden,
+        which is how the tests and the offline tools stay isolated.
+    */
+    void migrateLegacyDirectoryOnce()
+    {
+        static const bool done = []
+        {
+            const auto base = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory);
+            const auto current = base.getChildFile ("InfinityDrum");
+            const auto legacy = base.getChildFile ("DrumForge");
+
+            if (! current.exists() && legacy.isDirectory())
+                legacy.copyDirectoryTo (current);
+
+            return true;
+        }();
+
+        juce::ignoreUnused (done);
+    }
+}
+
 juce::File defaultSettingsDirectory()
 {
     if (overrideDirectory() != juce::File())
         return overrideDirectory();
 
+    migrateLegacyDirectoryOnce();
+
     return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
-               .getChildFile ("DrumForge");
+               .getChildFile ("InfinityDrum");
 }
 
 NoteMap loadNoteMapSetting (juce::File directory)

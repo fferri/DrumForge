@@ -65,7 +65,7 @@ class KitLibrary
 public:
     explicit KitLibrary (juce::File userDirectory = defaultUserDirectory());
 
-    /** ~/Library/DrumForge/Kits on macOS - JUCE resolves the application-data directory
+    /** ~/Library/InfinityDrum/Kits on macOS - JUCE resolves the application-data directory
         to ~/Library there, not to ~/Library/Application Support. */
     static juce::File defaultUserDirectory();
 

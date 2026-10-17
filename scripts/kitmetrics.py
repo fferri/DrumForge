@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Measure rendered DrumForge kits against the reference targets.
+"""Measure rendered InfinityDrum kits against the reference targets.
 
 The kit design harness has two halves. This is the measuring half: KitLab renders a
 .dfkit through a pattern matched to its lane, and this compares the result with what the

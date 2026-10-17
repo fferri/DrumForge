@@ -470,7 +470,7 @@ void DrumKitEditor::exportCurrentKitToFile()
 {
     const auto suggestedName = juce::isPositiveAndBelow (currentKitIndex, library.getNumKits())
                                  ? library.getName (currentKitIndex)
-                                 : juce::String ("DrumForge Kit");
+                                 : juce::String ("InfinityDrum Kit");
 
     auto chooser = std::make_shared<juce::FileChooser> (
         "Export the current kit",

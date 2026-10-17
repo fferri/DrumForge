@@ -144,10 +144,10 @@ public:
     state and a LookAndFeel instance is shared by every control, so they paint themselves
     (see VelocityKnob).
 */
-class DrumForgeLookAndFeel final : public juce::LookAndFeel_V4
+class InfinityDrumLookAndFeel final : public juce::LookAndFeel_V4
 {
 public:
-    DrumForgeLookAndFeel();
+    InfinityDrumLookAndFeel();
 
     juce::Font getComboBoxFont (juce::ComboBox&) override;
     juce::Font getLabelFont (juce::Label&) override;

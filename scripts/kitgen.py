@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate DrumForge kits as .dfkit files.
+"""Generate InfinityDrum kits as .dfkit files.
 
     python3 scripts/kitgen.py <output-dir>
 

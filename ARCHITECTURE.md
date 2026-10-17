@@ -1,6 +1,6 @@
-# DrumForge architecture
+# InfinityDrum architecture
 
-How the plugin is built and why it is built that way. For *using* DrumForge see
+How the plugin is built and why it is built that way. For *using* InfinityDrum see
 [README.md](README.md); for *changing* it, including the golden rules, see
 [AGENTS.md](AGENTS.md).
 
@@ -430,7 +430,7 @@ measuring the previous hit still ringing. It now renders past the decay first.
 
 ### The knobs paint themselves
 
-`DrumForgeLookAndFeel` deliberately does **not** implement `drawRotarySlider`. A LookAndFeel
+`InfinityDrumLookAndFeel` deliberately does **not** implement `drawRotarySlider`. A LookAndFeel
 instance serves every control in the editor, so it cannot hold per-knob state like a
 modulation depth. `VelocityKnob` is a `Slider` subclass that draws its own band, dot and
 pointer, and handles rim-drag for depth.
@@ -532,7 +532,7 @@ against the rest of the kit.
 ## Kit design
 
 The twenty-five factory kits were designed against reference recordings rather than by
-ear alone, using `DrumForgeKitLab` and `scripts/kitmetrics.py`.
+ear alone, using `InfinityDrumKitLab` and `scripts/kitmetrics.py`.
 
 The most useful finding was that the four lanes are separated by **dynamics, not timbre**:
 
@@ -566,19 +566,19 @@ Two things follow that are easy to get wrong:
 JUCE is **not vendored**. It is cloned as a subdirectory, which is why `JUCE/` is gitignored
 and why CI caches it — fetching it takes longer than the build.
 
-Everything except the entry point lives in a static library (`DrumForgeCore`) so the offline
+Everything except the entry point lives in a static library (`InfinityDrumCore`) so the offline
 tools can reuse it. `PluginEntry.cpp` is deliberately its own translation unit, compiled
 straight into the plugin target, so the wrapper can always find `createPluginFilter`
 regardless of how the linker treats the static library.
 
-`DrumForgeHostTest` deliberately does **not** link `DrumForgeCore`: it exercises the shipped
+`InfinityDrumHostTest` deliberately does **not** link `InfinityDrumCore`: it exercises the shipped
 `.vst3` as a black box, through the same hosting code a DAW uses, so it must not be able to
 reach into the plugin's internals.
 
 ### Two platform traps worth knowing
 
 - **A `gui_app` on Windows links `/SUBSYSTEM:WINDOWS`, which needs `WinMain`.** Only a
-  `JUCEApplication` built with `START_JUCE_APPLICATION` provides one. `DrumForgeScreenshot`
+  `JUCEApplication` built with `START_JUCE_APPLICATION` provides one. `InfinityDrumScreenshot`
   had a plain `main()`, so it failed to link there; it is a `console_app` now, which is also
   the honest description of a command-line tool that renders offscreen. `HostLoadTest`, by
   contrast, must be a `gui_app`: on macOS JUCE drives the message loop with `[NSApp run]`,
@@ -625,16 +625,16 @@ Four tools, all of which exit non-zero on failure and run in CI. What each one c
 
 | Tool | Covers |
 |---|---|
-| `DrumForgeTests` (433 checks) | Everything headless: engines, level bounds, decay to true silence, sample rates, de-clicking, choke group, the velocity curve and its clamping, depth persistence, kit capture/restore, the randomiser's constraints, note maps, XML and filesystem round trips, the full host lifecycle |
-| `DrumForgeHostTest` (23 checks) | End-to-end through JUCE's real VST3 hosting code — the same path a DAW takes: bus layout, MIDI, parameter exposure, rendering, editor construction and painting, state save/restore, prepare/release cycles |
-| `DrumForgeScreenshot` | Editor layout and painting at four window sizes. The only way to check the band and dot actually draw |
-| `DrumForgeRender` | Writes WAVs for listening. Not an assertion, but the quickest way to hear a regression |
+| `InfinityDrumTests` (433 checks) | Everything headless: engines, level bounds, decay to true silence, sample rates, de-clicking, choke group, the velocity curve and its clamping, depth persistence, kit capture/restore, the randomiser's constraints, note maps, XML and filesystem round trips, the full host lifecycle |
+| `InfinityDrumHostTest` (23 checks) | End-to-end through JUCE's real VST3 hosting code — the same path a DAW takes: bus layout, MIDI, parameter exposure, rendering, editor construction and painting, state save/restore, prepare/release cycles |
+| `InfinityDrumScreenshot` | Editor layout and painting at four window sizes. The only way to check the band and dot actually draw |
+| `InfinityDrumRender` | Writes WAVs for listening. Not an assertion, but the quickest way to hear a regression |
 
 ### What is not covered
 
 - **The editor's mouse gestures.** Rim drag, MOD drag and the right-click menu have no
   automated coverage; only the maths behind them does.
-- **The `DrumForgeScreenshot` output is not compared against a reference image.** It would
+- **The `InfinityDrumScreenshot` output is not compared against a reference image.** It would
   catch more, but image comparison is brittle across macOS versions.
 
 ### Two rules that exist because of specific bugs

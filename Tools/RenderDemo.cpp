@@ -1,5 +1,5 @@
 /*
-    DrumForge offline renderer.
+    InfinityDrum offline renderer.
 
     Drives the plugin's audio processor without a host and writes WAV files, so the
     instrument can be auditioned and measured from the command line.
@@ -9,7 +9,7 @@
       kit_*       the same four-bar beat played through each factory kit
       track_*     one bar per track of the default kit
 
-    Usage: DrumForgeRender [outputDirectory]
+    Usage: InfinityDrumRender [outputDirectory]
 */
 
 #include <cmath>
@@ -227,7 +227,7 @@ int main (int argc, char** argv)
 
     outputDirectory.createDirectory();
 
-    std::cout << "DrumForge offline render\n"
+    std::cout << "InfinityDrum offline render\n"
               << "  sample rate : " << sampleRate << " Hz\n"
               << "  output      : " << outputDirectory.getFullPathName().toStdString() << "\n\n";
 

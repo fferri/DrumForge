@@ -1,5 +1,5 @@
 /*
-    DrumForge - VST3 entry point.
+    InfinityDrum - VST3 entry point.
 
     Kept in its own translation unit that is compiled directly into the plugin target so
     the wrapper can always find `createPluginFilter`, regardless of how the linker treats

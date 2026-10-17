@@ -1,5 +1,5 @@
 /*
-    DrumForge offline verification.
+    InfinityDrum offline verification.
 
     Renders the processor without a host and asserts the properties that matter:
     every engine makes sound, decays to silence, never produces NaN/Inf, stays inside
@@ -1879,7 +1879,7 @@ void testSequencerAudio()
     section ("Sequencer: a lane actually plays the kit");
 
     setSettingsDirectoryOverride (juce::File::getSpecialLocation (juce::File::tempDirectory)
-                                      .getChildFile ("DrumForgeSeqTests"));
+                                      .getChildFile ("InfinityDrumSeqTests"));
 
     DrumKitProcessor processor;
     processor.prepareToPlay (48000.0, 512);
@@ -2022,7 +2022,7 @@ void testSequencerPersistence()
     section ("Sequencer: lanes survive a save and load");
 
     setSettingsDirectoryOverride (juce::File::getSpecialLocation (juce::File::tempDirectory)
-                                      .getChildFile ("DrumForgeSeqSaveTests"));
+                                      .getChildFile ("InfinityDrumSeqSaveTests"));
 
     DrumKitProcessor source;
     auto& lanes = source.getSequencerState();
@@ -2117,7 +2117,7 @@ void testKitLoadLeavesControlsFree()
     section ("Kits: loading one must not lock the controls");
 
     setSettingsDirectoryOverride (juce::File::getSpecialLocation (juce::File::tempDirectory)
-                                      .getChildFile ("DrumForgeKitLockTests"));
+                                      .getChildFile ("InfinityDrumKitLockTests"));
 
     DrumKitProcessor processor;
     DrumKitEditor editor (processor);
@@ -2316,7 +2316,7 @@ int main()
 
     juce::ScopedJuceInitialiser_GUI juceInitialiser;
 
-    std::cout << "DrumForge verification suite\n"
+    std::cout << "InfinityDrum verification suite\n"
               << "============================\n";
 
     testNoteMap();

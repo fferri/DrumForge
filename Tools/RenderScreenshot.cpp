@@ -1,12 +1,12 @@
 /*
-    DrumForge UI smoke test / screenshot generator.
+    InfinityDrum UI smoke test / screenshot generator.
 
     Instantiates the editor exactly as a host would, runs it through a few timer
     ticks and a block of audio, then renders it to a PNG. This proves the editor
     constructs, lays out and paints without a crash, which is not something the
     headless DSP tests can cover.
 
-    Usage: DrumForgeScreenshot [outputPng]
+    Usage: InfinityDrumScreenshot [outputPng]
 */
 
 #include <iostream>
@@ -64,7 +64,7 @@ int main (int argc, char** argv)
 
     const juce::File outputFile = argc > 1
         ? juce::File::getCurrentWorkingDirectory().getChildFile (argv[1])
-        : juce::File::getCurrentWorkingDirectory().getChildFile ("docs/drumforge-ui.png");
+        : juce::File::getCurrentWorkingDirectory().getChildFile ("docs/infinitydrum-ui.png");
 
     // Deterministic: never read the preferences of whoever runs this, so the committed
     // screenshot does not depend on which note map they happen to use. This has to come

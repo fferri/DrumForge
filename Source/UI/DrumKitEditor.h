@@ -70,7 +70,7 @@ private:
     static constexpr int topBarHeight = 70;
     static constexpr int tabBarHeight = 34;
 
-    DrumForgeLookAndFeel lookAndFeel;
+    InfinityDrumLookAndFeel lookAndFeel;
     juce::TooltipWindow tooltipWindow { this, 650 };
 
     KitLibrary library;

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(DrumForge VERSION 1.1.1 LANGUAGES C CXX)
+project(InfinityDrum VERSION 1.1.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -17,7 +17,7 @@ add_subdirectory(JUCE)
 # Shared core: synthesis engines, track/processor, editor.
 # Kept as its own library so the offline test and render tools can reuse it.
 #===============================================================================
-add_library(DrumForgeCore STATIC
+add_library(InfinityDrumCore STATIC
     Source/Core/Parameters.cpp
     Source/Core/ModulationState.cpp
     Source/Core/Sequencer.cpp
@@ -33,15 +33,15 @@ add_library(DrumForgeCore STATIC
     Source/UI/TrackHeader.cpp
     Source/UI/SequencerLane.cpp)
 
-target_include_directories(DrumForgeCore PUBLIC Source)
+target_include_directories(InfinityDrumCore PUBLIC Source)
 
-target_compile_definitions(DrumForgeCore PUBLIC
+target_compile_definitions(InfinityDrumCore PUBLIC
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JUCE_STRICT_REFCOUNTEDPOINTER=1
     JUCE_MODAL_LOOPS_PERMITTED=0)
 
-target_link_libraries(DrumForgeCore PUBLIC
+target_link_libraries(InfinityDrumCore PUBLIC
     juce::juce_audio_processors
     juce::juce_gui_basics
     juce::juce_recommended_config_flags
@@ -50,14 +50,14 @@ target_link_libraries(DrumForgeCore PUBLIC
 #===============================================================================
 # The plugin itself.
 #===============================================================================
-juce_add_plugin(DrumForge
-    COMPANY_NAME "DrumForge Audio"
-    BUNDLE_ID "com.drumforgeaudio.drumforge"
-    PLUGIN_MANUFACTURER_CODE Dfga
-    PLUGIN_CODE Df01
+juce_add_plugin(InfinityDrum
+    COMPANY_NAME "InfinityDrum Audio"
+    BUNDLE_ID "com.infinitydrumaudio.infinitydrum"
+    PLUGIN_MANUFACTURER_CODE Infa
+    PLUGIN_CODE In01
     FORMATS VST3
-    PRODUCT_NAME "DrumForge"
-    DESCRIPTION "8-track drum and percussion synthesiser with seven synthesis engines"
+    PRODUCT_NAME "InfinityDrum"
+    DESCRIPTION "Eight-track drum and percussion synthesiser with nine synthesis engines"
     IS_SYNTH TRUE
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT FALSE
@@ -65,11 +65,11 @@ juce_add_plugin(DrumForge
     VST3_CATEGORIES "Instrument" "Drum"
     COPY_PLUGIN_AFTER_BUILD FALSE)
 
-target_sources(DrumForge PRIVATE Source/PluginEntry.cpp)
+target_sources(InfinityDrum PRIVATE Source/PluginEntry.cpp)
 
-target_link_libraries(DrumForge PRIVATE DrumForgeCore)
+target_link_libraries(InfinityDrum PRIVATE InfinityDrumCore)
 
-target_compile_definitions(DrumForge PUBLIC
+target_compile_definitions(InfinityDrum PUBLIC
     JUCE_VST3_CAN_REPLACE_VST2=0)
 
 # CMake signs the bundle as part of linking, but JUCE writes
@@ -83,28 +83,28 @@ target_compile_definitions(DrumForge PUBLIC
 # and seals whatever is actually in the bundle by then. The verify command is deliberate: a
 # regression should fail the build, not ship quietly.
 if(APPLE)
-    add_custom_command(TARGET DrumForge_VST3 POST_BUILD
-        COMMAND codesign --force --sign - "$<TARGET_BUNDLE_DIR:DrumForge_VST3>"
-        COMMAND codesign --verify --verbose=2 "$<TARGET_BUNDLE_DIR:DrumForge_VST3>"
-        COMMENT "Re-signing DrumForge.vst3 after moduleinfo.json is written"
+    add_custom_command(TARGET InfinityDrum_VST3 POST_BUILD
+        COMMAND codesign --force --sign - "$<TARGET_BUNDLE_DIR:InfinityDrum_VST3>"
+        COMMAND codesign --verify --verbose=2 "$<TARGET_BUNDLE_DIR:InfinityDrum_VST3>"
+        COMMENT "Re-signing InfinityDrum.vst3 after moduleinfo.json is written"
         VERBATIM)
 endif()
 
 #===============================================================================
 # Offline tools (headless; they drive the processor directly).
 #===============================================================================
-juce_add_console_app(DrumForgeRender PRODUCT_NAME "DrumForgeRender")
-target_sources(DrumForgeRender PRIVATE Tools/RenderDemo.cpp)
-target_link_libraries(DrumForgeRender PRIVATE DrumForgeCore juce::juce_audio_formats)
+juce_add_console_app(InfinityDrumRender PRODUCT_NAME "InfinityDrumRender")
+target_sources(InfinityDrumRender PRIVATE Tools/RenderDemo.cpp)
+target_link_libraries(InfinityDrumRender PRIVATE InfinityDrumCore juce::juce_audio_formats)
 
 # Kit design harness: renders .dfkit files through lane-matched patterns.
-juce_add_console_app(DrumForgeKitLab PRODUCT_NAME "DrumForgeKitLab")
-target_sources(DrumForgeKitLab PRIVATE Tools/KitLab.cpp)
-target_link_libraries(DrumForgeKitLab PRIVATE DrumForgeCore juce::juce_audio_formats)
+juce_add_console_app(InfinityDrumKitLab PRODUCT_NAME "InfinityDrumKitLab")
+target_sources(InfinityDrumKitLab PRIVATE Tools/KitLab.cpp)
+target_link_libraries(InfinityDrumKitLab PRIVATE InfinityDrumCore juce::juce_audio_formats)
 
-juce_add_console_app(DrumForgeTests PRODUCT_NAME "DrumForgeTests")
-target_sources(DrumForgeTests PRIVATE Tools/RenderTests.cpp)
-target_link_libraries(DrumForgeTests PRIVATE DrumForgeCore)
+juce_add_console_app(InfinityDrumTests PRODUCT_NAME "InfinityDrumTests")
+target_sources(InfinityDrumTests PRIVATE Tools/RenderTests.cpp)
+target_link_libraries(InfinityDrumTests PRIVATE InfinityDrumCore)
 
 # GUI smoke test: constructs the real editor and renders it to a PNG.
 #
@@ -113,22 +113,22 @@ target_link_libraries(DrumForgeTests PRIVATE DrumForgeCore)
 # START_JUCE_APPLICATION provides one. This tool has a plain main(), so a gui_app target
 # fails to link there. It is a command-line tool that renders offscreen, so the console
 # subsystem is also the honest description of what it is.
-juce_add_console_app(DrumForgeScreenshot PRODUCT_NAME "DrumForgeScreenshot")
-target_sources(DrumForgeScreenshot PRIVATE Tools/RenderScreenshot.cpp)
-target_link_libraries(DrumForgeScreenshot PRIVATE DrumForgeCore)
+juce_add_console_app(InfinityDrumScreenshot PRODUCT_NAME "InfinityDrumScreenshot")
+target_sources(InfinityDrumScreenshot PRIVATE Tools/RenderScreenshot.cpp)
+target_link_libraries(InfinityDrumScreenshot PRIVATE InfinityDrumCore)
 
 # End-to-end test: loads the built .vst3 through JUCE's VST3 hosting code, exactly as
-# a DAW would. Deliberately does NOT link DrumForgeCore - it exercises the shipped
+# a DAW would. Deliberately does NOT link InfinityDrumCore - it exercises the shipped
 # binary as a black box, so the host-side code must be compiled into this target.
 # Must be a gui_app rather than a console_app: on macOS JUCE drives the message loop with
 # [NSApp run], which only works from a real app bundle.
-juce_add_gui_app(DrumForgeHostTest PRODUCT_NAME "DrumForgeHostTest")
-target_sources(DrumForgeHostTest PRIVATE Tools/HostLoadTest.cpp)
-target_compile_definitions(DrumForgeHostTest PRIVATE
+juce_add_gui_app(InfinityDrumHostTest PRODUCT_NAME "InfinityDrumHostTest")
+target_sources(InfinityDrumHostTest PRIVATE Tools/HostLoadTest.cpp)
+target_compile_definitions(InfinityDrumHostTest PRIVATE
     JUCE_PLUGINHOST_VST3=1
     JUCE_MODAL_LOOPS_PERMITTED=0)
-target_link_libraries(DrumForgeHostTest PRIVATE
+target_link_libraries(InfinityDrumHostTest PRIVATE
     juce::juce_audio_processors
     juce::juce_gui_basics
     juce::juce_recommended_config_flags)
-add_dependencies(DrumForgeHostTest DrumForge)
+add_dependencies(InfinityDrumHostTest InfinityDrum)

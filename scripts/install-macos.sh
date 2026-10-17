@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Install DrumForge into your VST3 folder.
+# Install InfinityDrum into your VST3 folder.
 #
 #   ./install-macos.sh                    install to ~/Library/Audio/Plug-Ins/VST3
 #   ./install-macos.sh /path/to/VST3      install somewhere else
@@ -14,12 +14,12 @@
 set -eu
 
 here=$(cd "$(dirname "$0")" && pwd)
-source_plugin="$here/DrumForge.vst3"
+source_plugin="$here/InfinityDrum.vst3"
 destination="${1:-$HOME/Library/Audio/Plug-Ins/VST3}"
-installed="$destination/DrumForge.vst3"
+installed="$destination/InfinityDrum.vst3"
 
 if [ ! -d "$source_plugin" ]; then
-    echo "error: DrumForge.vst3 is not next to this script." >&2
+    echo "error: InfinityDrum.vst3 is not next to this script." >&2
     echo "       Unzip the download first, then run the script from inside it." >&2
     exit 1
 fi
@@ -35,7 +35,7 @@ if [ -z "$destination" ] || [ "$destination" = "/" ]; then
     exit 1
 fi
 
-echo "DrumForge installer"
+echo "InfinityDrum installer"
 echo "  from $source_plugin"
 echo "  to   $installed"
 echo
@@ -56,5 +56,5 @@ xattr -dr com.apple.quarantine "$installed" 2>/dev/null || true
 
 echo "Installed."
 echo
-echo "Rescan plugins in your DAW and DrumForge will appear as an instrument."
+echo "Rescan plugins in your DAW and InfinityDrum will appear as an instrument."
 echo "If it does not, check that the DAW is looking at $destination"
