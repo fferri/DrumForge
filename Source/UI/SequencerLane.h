@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "../Core/DrumKitProcessor.h"
@@ -8,23 +10,88 @@
 namespace df
 {
 
-/** One track's lane on the sequencer page.
+/** A compact integer control: a label, a minus button, the value, a plus button.
 
-    Every lane has its own type, speed and length, which is what makes polymeters work. The
-    type decides what the editor strip in the middle does:
+    Length, trig count and offset all need the same thing, and a slider would waste the
+    width that the step grid needs.
+*/
+class ValueStepper final : public juce::Component,
+                          public juce::SettableTooltipClient
+{
+public:
+    ValueStepper (juce::String caption, int minValue, int maxValue);
 
-    | Type | Strip | Extra controls |
-    |---|---|---|
-    | Grid | steps you click to toggle | - |
-    | Euclidean | the pattern the sliders produce, drawn read-only | pulses, steps |
-    | Modulation | a breakpoint envelope you draw | target, amount |
+    void resized() override;
+    void paint (juce::Graphics&) override;
+
+    void setValue (int newValue, juce::NotificationType);
+    int getValue() const noexcept { return value; }
+
+    void setBoundsTo (juce::Rectangle<int> area) { setBounds (area); }
+    void setLimits (int minValue, int maxValue);
+
+    std::function<void (int)> onChange;
+
+private:
+    void nudge (int delta);
+
+    juce::String caption;
+    int minimum, maximum, value = 0;
+    juce::TextButton minus { "-" }, plus { "+" };
+};
+
+//==============================================================================
+/** One track's trigger sequencer: either a grid or a Euclidean pattern.
+
+    The three selectors are stacked vertically to keep the row wide enough for the steps.
 */
 class SequencerLaneComponent final : public juce::Component,
+                                     private juce::ComboBox::Listener
+{
+public:
+    SequencerLaneComponent (DrumKitProcessor&, int trackIndex);
+
+    void resized() override;
+    void paint (juce::Graphics&) override;
+    void mouseDown (const juce::MouseEvent&) override;
+
+    void refreshFromProcessor();
+
+private:
+    void comboBoxChanged (juce::ComboBox*) override;
+
+    TriggerLane& lane() noexcept;
+    const TriggerLane& lane() const noexcept;
+
+    void syncControls();
+    void clampEuclidean();
+    int stepIndexAt (juce::Point<int>) const noexcept;
+
+    DrumKitProcessor& processor;
+    const int trackIndex;
+
+    juce::ComboBox modeBox, speedBox;
+    ValueStepper lengthStepper { "Steps", 1, kMaxLaneSteps };
+    ValueStepper trigsStepper { "Trigs", 0, kMaxLaneSteps };
+    ValueStepper offsetStepper { "Offset", -kMaxLaneSteps, kMaxLaneSteps };
+
+    juce::Rectangle<int> identityArea, controlsArea, euclideanArea, editorBounds;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SequencerLaneComponent)
+};
+
+//==============================================================================
+/** One track's automation lane: a breakpoint envelope sweeping one parameter.
+
+    A track can carry several of these on top of its trigger sequencer, so the row also has
+    a slot selector.
+*/
+class AutomationLaneComponent final : public juce::Component,
                                       private juce::ComboBox::Listener,
                                       private juce::Slider::Listener
 {
 public:
-    SequencerLaneComponent (DrumKitProcessor&, int trackIndex);
+    AutomationLaneComponent (DrumKitProcessor&, int trackIndex);
 
     void resized() override;
     void paint (juce::Graphics&) override;
@@ -33,35 +100,31 @@ public:
     void mouseDrag (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;
 
-    /** Re-reads the lane and shows or hides the controls its type needs. */
     void refreshFromProcessor();
-
-    int getTrackIndex() const noexcept { return trackIndex; }
 
 private:
     void comboBoxChanged (juce::ComboBox*) override;
     void sliderValueChanged (juce::Slider*) override;
 
-    SequencerLane& lane() noexcept;
-    const SequencerLane& lane() const noexcept;
+    AutomationLane& lane() noexcept;
+    const AutomationLane& lane() const noexcept;
 
-    void updateControlVisibility();
-    void pushTypeToControls();
-    int stepIndexAt (juce::Point<int>) const noexcept;
+    void syncControls();
     int findPointAt (juce::Point<int>) const noexcept;
-    void nudgePoints();
 
     DrumKitProcessor& processor;
     const int trackIndex;
+    int slot = 0;
 
-    juce::ComboBox typeBox, speedBox, lengthBox, targetBox;
-    juce::Slider pulsesSlider, stepsSlider, amountSlider;
+    juce::ComboBox slotBox, speedBox, targetBox;
+    ValueStepper lengthStepper { "Steps", 1, kMaxLaneSteps };
+    juce::Slider amountSlider;
 
-    juce::Rectangle<int> identityArea, controlsArea, editorBounds, extraArea;
+    juce::Rectangle<int> identityArea, controlsArea, editorBounds;
 
     int draggedPoint = -1;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SequencerLaneComponent)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AutomationLaneComponent)
 };
 
 } // namespace df

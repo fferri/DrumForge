@@ -18,7 +18,8 @@ struct EditorUiState
     {
         synth = 0,   ///< editing the sound itself
         mod,         ///< editing modulation depths
-        seq,         ///< sequencers
+        seq,         ///< trigger sequencers
+        automation,  ///< parameter automation lanes
         fx           ///< the reverb and other shared processing
     };
 
@@ -27,6 +28,7 @@ struct EditorUiState
     bool isModulationMode() const noexcept { return mode.load() == Mode::mod; }
     bool isSynthMode() const noexcept { return mode.load() == Mode::synth; }
     bool isSequencerMode() const noexcept { return mode.load() == Mode::seq; }
+    bool isAutomationMode() const noexcept { return mode.load() == Mode::automation; }
     bool isFxMode() const noexcept { return mode.load() == Mode::fx; }
 };
 

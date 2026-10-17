@@ -8,147 +8,166 @@
 namespace df
 {
 
+//==============================================================================
+ValueStepper::ValueStepper (juce::String captionText, int minValue, int maxValue)
+    : caption (std::move (captionText)), minimum (minValue), maximum (maxValue)
+{
+    for (auto* button : { &minus, &plus })
+    {
+        button->setConnectedEdges (juce::Button::ConnectedOnLeft | juce::Button::ConnectedOnRight);
+        addAndMakeVisible (*button);
+    }
+
+    minus.onClick = [this] { nudge (-1); };
+    plus.onClick  = [this] { nudge (1); };
+}
+
+void ValueStepper::setValue (int newValue, juce::NotificationType notification)
+{
+    const int clamped = juce::jlimit (minimum, maximum, newValue);
+
+    if (clamped == value)
+        return;
+
+    value = clamped;
+    repaint();
+
+    if (notification != juce::dontSendNotification && onChange != nullptr)
+        onChange (value);
+}
+
+void ValueStepper::setLimits (int minValue, int maxValue)
+{
+    minimum = minValue;
+    maximum = maxValue;
+    value = juce::jlimit (minimum, maximum, value);
+    repaint();
+}
+
+void ValueStepper::nudge (int delta)
+{
+    setValue (value + delta, juce::sendNotificationSync);
+}
+
+void ValueStepper::resized()
+{
+    auto area = getLocalBounds();
+
+    plus.setBounds (area.removeFromRight (18));
+    minus.setBounds (area.removeFromRight (18));
+}
+
+void ValueStepper::paint (juce::Graphics& g)
+{
+    auto area = getLocalBounds();
+
+    g.setColour (theme::panelAlt);
+    g.fillRoundedRectangle (area.toFloat(), 3.0f);
+
+    g.setColour (theme::textDim);
+    g.setFont (theme::font (9.0f));
+    g.drawText (caption, area.removeFromLeft (38).reduced (5, 0),
+                juce::Justification::centredLeft, false);
+
+    g.setColour (theme::text);
+    g.setFont (theme::font (11.0f, juce::Font::bold));
+    g.drawText (juce::String (value), area.reduced (2, 0), juce::Justification::centred, false);
+}
+
+//==============================================================================
 SequencerLaneComponent::SequencerLaneComponent (DrumKitProcessor& owner, int index)
     : processor (owner), trackIndex (index)
 {
-    const auto addCombo = [this] (juce::ComboBox& box, const char* tooltip)
-    {
-        box.setTooltip (tooltip);
-        box.addListener (this);
-        addAndMakeVisible (box);
-    };
+    modeBox.setTooltip ("How the pattern is built: an explicit grid, or pulses spread "
+                        "evenly across the steps.");
+    speedBox.setTooltip ("How fast. A step is a 1/16 note divided by this, so a bigger "
+                         "number is faster. Off stops the lane.");
+    lengthStepper.setBoundsTo (getLocalBounds());
+    lengthStepper.setTooltip ("How many steps before the pattern repeats. Independent of "
+                              "speed, which is what allows polymeters.");
+    trigsStepper.setTooltip ("How many pulses to spread across the steps.");
+    offsetStepper.setTooltip ("Where the pattern starts. Negative walks it backwards.");
 
-    addCombo (typeBox, "What this lane plays.");
-    addCombo (speedBox, "How fast. A step is a 1/16 note divided by this, so a bigger number "
-                        "is faster.");
-    addCombo (lengthBox, "How many steps before the pattern repeats. Independent of speed, "
-                         "which is what allows polymeters.");
-    addCombo (targetBox, "Which parameter the envelope moves.");
+    modeBox.addListener (this);
+    speedBox.addListener (this);
+    addAndMakeVisible (modeBox);
+    addAndMakeVisible (speedBox);
 
-    for (int i = 0; i < kNumLaneTypes; ++i)
-        typeBox.addItem (laneTypeName ((LaneType) i), i + 1);
+    for (int i = 0; i < kNumTriggerModes; ++i)
+        modeBox.addItem (triggerModeName ((TriggerMode) i), i + 1);
 
     for (int i = 0; i < kNumLaneSpeeds; ++i)
         speedBox.addItem (laneSpeedName ((LaneSpeed) i), i + 1);
 
-    for (int i = 1; i <= kMaxLaneSteps; ++i)
-        lengthBox.addItem (juce::String (i), i);
+    lengthStepper.onChange = [this] (int v) { lane().length = v; clampEuclidean(); repaint(); };
+    trigsStepper.onChange  = [this] (int v) { lane().trigs = v; repaint(); };
+    offsetStepper.onChange = [this] (int v) { lane().offset = v; repaint(); };
 
-    for (int i = 0; i < kNumModTargets; ++i)
-        targetBox.addItem (modTargetName (i), i + 1);
+    addAndMakeVisible (lengthStepper);
+    addAndMakeVisible (trigsStepper);
+    addAndMakeVisible (offsetStepper);
 
-    const auto setUpSlider = [this] (juce::Slider& slider, double min, double max)
-    {
-        slider.setSliderStyle (juce::Slider::LinearBar);
-        slider.setTextBoxStyle (juce::Slider::TextBoxAbove, false, 60, 16);
-        slider.setRange (min, max, 1.0);
-        slider.addListener (this);
-        addAndMakeVisible (slider);
-    };
-
-    setUpSlider (pulsesSlider, 0.0, (double) kMaxLaneSteps);
-    setUpSlider (stepsSlider, 1.0, (double) kMaxLaneSteps);
-    setUpSlider (amountSlider, 0.0, 100.0);
-
-    pulsesSlider.setTooltip ("How many pulses to spread across the steps.");
-    stepsSlider.setTooltip ("How many steps to spread the pulses across.");
-    amountSlider.setTooltip ("How far the envelope moves the parameter, as a percentage of "
-                             "its travel.");
-
-    refreshFromProcessor();
+    syncControls();
 }
 
-SequencerLane& SequencerLaneComponent::lane() noexcept
+void SequencerLaneComponent::clampEuclidean()
 {
-    return processor.getSequencerState().lanes[(size_t) trackIndex];
+    auto& current = lane();
+    current.trigs = juce::jlimit (0, current.length, current.trigs);
+    current.offset = juce::jlimit (-current.length, current.length, current.offset);
 }
 
-const SequencerLane& SequencerLaneComponent::lane() const noexcept
+TriggerLane& SequencerLaneComponent::lane() noexcept
 {
-    return processor.getSequencerState().lanes[(size_t) trackIndex];
+    return processor.getSequencerState().triggers[(size_t) trackIndex];
+}
+
+const TriggerLane& SequencerLaneComponent::lane() const noexcept
+{
+    return processor.getSequencerState().triggers[(size_t) trackIndex];
 }
 
 void SequencerLaneComponent::refreshFromProcessor()
 {
-    pushTypeToControls();
-    updateControlVisibility();
+    syncControls();
     repaint();
 }
 
-void SequencerLaneComponent::pushTypeToControls()
+void SequencerLaneComponent::syncControls()
 {
     const auto& current = lane();
 
-    typeBox.setSelectedId ((int) current.type + 1, juce::dontSendNotification);
+    modeBox.setSelectedId ((int) current.mode + 1, juce::dontSendNotification);
     speedBox.setSelectedId ((int) current.speed + 1, juce::dontSendNotification);
-    lengthBox.setSelectedId (juce::jlimit (1, kMaxLaneSteps, current.length),
-                             juce::dontSendNotification);
-    targetBox.setSelectedId (juce::jlimit (0, kNumModTargets - 1, current.modTarget) + 1,
-                             juce::dontSendNotification);
 
-    pulsesSlider.setValue ((double) current.pulses, juce::dontSendNotification);
-    stepsSlider.setValue ((double) current.euclideanSteps, juce::dontSendNotification);
-    amountSlider.setValue ((double) current.amount * 100.0f, juce::dontSendNotification);
+    lengthStepper.setValue (current.length, juce::dontSendNotification);
+    trigsStepper.setLimits (0, current.length);
+    trigsStepper.setValue (current.trigs, juce::dontSendNotification);
+    offsetStepper.setLimits (-current.length, current.length);
+    offsetStepper.setValue (current.offset, juce::dontSendNotification);
+
+    const bool euclidean = current.mode == TriggerMode::euclidean;
+
+    trigsStepper.setVisible (euclidean);
+    offsetStepper.setVisible (euclidean);
 }
 
-void SequencerLaneComponent::updateControlVisibility()
-{
-    const auto type = lane().type;
-
-    pulsesSlider.setVisible (type == LaneType::euclidean);
-    stepsSlider.setVisible (type == LaneType::euclidean);
-    targetBox.setVisible (type == LaneType::modulation);
-    amountSlider.setVisible (type == LaneType::modulation);
-}
-
-//==============================================================================
 void SequencerLaneComponent::comboBoxChanged (juce::ComboBox* box)
 {
     auto& current = lane();
 
-    if (box == &typeBox)
+    if (box == &modeBox)
     {
-        current.setDefaultsFor ((LaneType) juce::jmax (0, typeBox.getSelectedId() - 1));
-        updateControlVisibility();
-        pushTypeToControls();
-        resized();
+        current.setDefaultsFor ((TriggerMode) juce::jmax (0, modeBox.getSelectedId() - 1));
+        clampEuclidean();
     }
     else if (box == &speedBox)
     {
         current.speed = (LaneSpeed) juce::jlimit (0, kNumLaneSpeeds - 1, speedBox.getSelectedId() - 1);
     }
-    else if (box == &lengthBox)
-    {
-        current.length = juce::jlimit (1, kMaxLaneSteps, lengthBox.getSelectedId());
-    }
-    else if (box == &targetBox)
-    {
-        current.modTarget = juce::jlimit (0, kNumModTargets - 1, targetBox.getSelectedId() - 1);
-    }
 
-    repaint();
-}
-
-void SequencerLaneComponent::sliderValueChanged (juce::Slider* slider)
-{
-    auto& current = lane();
-
-    if (slider == &pulsesSlider)
-    {
-        current.pulses = juce::jlimit (0, kMaxLaneSteps, juce::roundToInt (pulsesSlider.getValue()));
-        pulsesSlider.setValue ((double) current.pulses, juce::dontSendNotification);
-    }
-    else if (slider == &stepsSlider)
-    {
-        current.euclideanSteps = juce::jlimit (1, kMaxLaneSteps,
-                                               juce::roundToInt (stepsSlider.getValue()));
-        stepsSlider.setValue ((double) current.euclideanSteps, juce::dontSendNotification);
-    }
-    else if (slider == &amountSlider)
-    {
-        current.amount = (float) amountSlider.getValue() / 100.0f;
-    }
-
+    syncControls();
+    resized();
     repaint();
 }
 
@@ -160,36 +179,33 @@ void SequencerLaneComponent::resized()
     identityArea = area.removeFromLeft (84);
     area.removeFromLeft (6);
 
+    // The three selectors stack, which is what leaves the row wide enough for the steps.
+    controlsArea = area.removeFromLeft (118);
     {
-        auto specs = area.removeFromLeft (300).withSizeKeepingCentre (300, 24);
+        auto stack = controlsArea;
+        const int cellHeight = juce::jmin (20, (stack.getHeight() - 4) / 3);
 
-        typeBox.setBounds (specs.removeFromLeft (100).reduced (2, 0));
-        speedBox.setBounds (specs.removeFromLeft (100).reduced (2, 0));
-        lengthBox.setBounds (specs.removeFromLeft (100).reduced (2, 0));
+        modeBox.setBounds (stack.removeFromTop (cellHeight));
+        stack.removeFromTop (2);
+        speedBox.setBounds (stack.removeFromTop (cellHeight));
+        stack.removeFromTop (2);
+        lengthStepper.setBounds (stack.removeFromTop (cellHeight));
     }
 
-    area.removeFromLeft (8);
+    area.removeFromLeft (10);
 
-    extraArea = area.removeFromRight (196);
-
+    euclideanArea = area.removeFromRight (150);
     {
-        auto row = extraArea.withSizeKeepingCentre (196, 24);
+        auto stack = euclideanArea.withSizeKeepingCentre (150, juce::jmin (euclideanArea.getHeight(), 44));
 
-        pulsesSlider.setBounds (row.removeFromLeft (96).reduced (2, 0));
-        stepsSlider.setBounds (row.removeFromLeft (96).reduced (2, 0));
+        trigsStepper.setBounds (stack.removeFromTop (20));
+        stack.removeFromTop (2);
+        offsetStepper.setBounds (stack.removeFromTop (20));
     }
 
-    {
-        auto row = extraArea.withSizeKeepingCentre (196, 24);
-
-        targetBox.setBounds (row.removeFromLeft (120).reduced (2, 0));
-        amountSlider.setBounds (row.removeFromLeft (72).reduced (2, 0));
-    }
-
-    editorBounds = area.withTrimmedRight (8);
+    editorBounds = area.withTrimmedRight (10);
 }
 
-//==============================================================================
 int SequencerLaneComponent::stepIndexAt (juce::Point<int> position) const noexcept
 {
     if (editorBounds.isEmpty())
@@ -202,7 +218,201 @@ int SequencerLaneComponent::stepIndexAt (juce::Point<int> position) const noexce
     return juce::jlimit (0, columns - 1, (int) std::floor (relative * (float) columns));
 }
 
-int SequencerLaneComponent::findPointAt (juce::Point<int> position) const noexcept
+void SequencerLaneComponent::mouseDown (const juce::MouseEvent& event)
+{
+    auto& current = lane();
+
+    if (current.mode != TriggerMode::grid || ! editorBounds.contains (event.getPosition()))
+        return;
+
+    const int step = stepIndexAt (event.getPosition());
+
+    if (juce::isPositiveAndBelow (step, current.length))
+    {
+        current.steps[(size_t) step] = ! current.steps[(size_t) step];
+        repaint (editorBounds);
+    }
+}
+
+void SequencerLaneComponent::paint (juce::Graphics& g)
+{
+    const auto bounds = getLocalBounds().toFloat().reduced (1.0f);
+
+    g.setColour (theme::panel);
+    g.fillRoundedRectangle (bounds, 5.0f);
+    g.setColour (theme::outline);
+    g.drawRoundedRectangle (bounds, 5.0f, 1.0f);
+
+    const int model = processor.getSelectedModel (trackIndex);
+    const auto& info = getModelInfo (juce::jlimit (0, kNumModels - 1, model));
+
+    {
+        auto identity = identityArea;
+
+        g.setColour (juce::Colour (info.colour));
+        g.setFont (theme::font (13.0f, juce::Font::bold));
+        g.drawText (juce::String (trackIndex + 1), identity.removeFromTop (17),
+                    juce::Justification::centredLeft, false);
+
+        g.setColour (theme::text);
+        g.setFont (theme::font (10.0f, juce::Font::bold));
+        g.drawText (juce::String (info.name).toUpperCase(), identity.removeFromTop (13),
+                    juce::Justification::centredLeft, false);
+    }
+
+    if (editorBounds.isEmpty())
+        return;
+
+    const auto& current = lane();
+    const auto grid = editorBounds.toFloat();
+
+    g.setColour (juce::Colour (0xff101317));
+    g.fillRoundedRectangle (grid, 3.0f);
+
+    const bool running = current.speed != LaneSpeed::off;
+    const int columns = juce::jmax (1, current.length);
+    const float cellWidth = grid.getWidth() / (float) columns;
+    const float inset = juce::jmin (2.0f, cellWidth * 0.15f);
+
+    for (int step = 0; step < columns; ++step)
+    {
+        const bool on = current.isStepOn (step);
+
+        g.setColour (running && on
+                        ? theme::accent
+                        : (step % 4 == 0 ? theme::panelAlt.brighter (0.25f) : theme::panelAlt));
+
+        g.fillRoundedRectangle (grid.getX() + cellWidth * (float) step + inset,
+                                grid.getY() + inset,
+                                cellWidth - inset * 2.0f,
+                                grid.getHeight() - inset * 2.0f,
+                                1.5f);
+    }
+}
+
+//==============================================================================
+AutomationLaneComponent::AutomationLaneComponent (DrumKitProcessor& owner, int index)
+    : processor (owner), trackIndex (index)
+{
+    slotBox.setTooltip ("Which automation lane to edit. A track can carry four.");
+    speedBox.setTooltip ("How fast the envelope runs. Off stops it.");
+    targetBox.setTooltip ("Which parameter the envelope moves.");
+    lengthStepper.setBoundsTo (getLocalBounds());
+    lengthStepper.setTooltip ("How many steps the envelope spans.");
+
+    for (auto* box : { &slotBox, &speedBox, &targetBox })
+    {
+        box->addListener (this);
+        addAndMakeVisible (*box);
+    }
+
+    for (int i = 0; i < kMaxAutomationLanes; ++i)
+        slotBox.addItem (juce::String (i + 1), i + 1);
+
+    for (int i = 0; i < kNumLaneSpeeds; ++i)
+        speedBox.addItem (laneSpeedName ((LaneSpeed) i), i + 1);
+
+    for (int i = 0; i < kNumModTargets; ++i)
+        targetBox.addItem (modTargetName (i), i + 1);
+
+    amountSlider.setSliderStyle (juce::Slider::LinearBar);
+    amountSlider.setTextBoxStyle (juce::Slider::TextBoxAbove, false, 56, 14);
+    amountSlider.setRange (0.0, 100.0, 1.0);
+    amountSlider.setTooltip ("How far the envelope moves the parameter.");
+    amountSlider.addListener (this);
+    addAndMakeVisible (amountSlider);
+
+    lengthStepper.onChange = [this] (int v) { lane().length = v; repaint(); };
+    addAndMakeVisible (lengthStepper);
+
+    syncControls();
+}
+
+AutomationLane& AutomationLaneComponent::lane() noexcept
+{
+    return processor.getSequencerState()
+        .automation[(size_t) trackIndex][(size_t) juce::jlimit (0, kMaxAutomationLanes - 1, slot)];
+}
+
+const AutomationLane& AutomationLaneComponent::lane() const noexcept
+{
+    return processor.getSequencerState()
+        .automation[(size_t) trackIndex][(size_t) juce::jlimit (0, kMaxAutomationLanes - 1, slot)];
+}
+
+void AutomationLaneComponent::refreshFromProcessor()
+{
+    syncControls();
+    repaint();
+}
+
+void AutomationLaneComponent::syncControls()
+{
+    const auto& current = lane();
+
+    slotBox.setSelectedId (slot + 1, juce::dontSendNotification);
+    speedBox.setSelectedId ((int) current.speed + 1, juce::dontSendNotification);
+    targetBox.setSelectedId (juce::jlimit (0, kNumModTargets - 1, current.target) + 1,
+                             juce::dontSendNotification);
+    lengthStepper.setValue (current.length, juce::dontSendNotification);
+    amountSlider.setValue ((double) current.amount * 100.0f, juce::dontSendNotification);
+}
+
+void AutomationLaneComponent::comboBoxChanged (juce::ComboBox* box)
+{
+    if (box == &slotBox)
+    {
+        slot = juce::jlimit (0, kMaxAutomationLanes - 1, slotBox.getSelectedId() - 1);
+        syncControls();
+        repaint();
+        return;
+    }
+
+    auto& current = lane();
+
+    if (box == &speedBox)
+        current.speed = (LaneSpeed) juce::jlimit (0, kNumLaneSpeeds - 1, speedBox.getSelectedId() - 1);
+    else if (box == &targetBox)
+        current.target = juce::jlimit (0, kNumModTargets - 1, targetBox.getSelectedId() - 1);
+
+    repaint();
+}
+
+void AutomationLaneComponent::sliderValueChanged (juce::Slider*)
+{
+    lane().amount = (float) amountSlider.getValue() / 100.0f;
+    repaint();
+}
+
+void AutomationLaneComponent::resized()
+{
+    auto area = getLocalBounds().reduced (8, 5);
+
+    identityArea = area.removeFromLeft (84);
+    area.removeFromLeft (6);
+
+    controlsArea = area.removeFromLeft (118);
+    {
+        auto stack = controlsArea;
+        const int cellHeight = juce::jmin (20, (stack.getHeight() - 6) / 4);
+
+        slotBox.setBounds (stack.removeFromTop (cellHeight));
+        stack.removeFromTop (2);
+        speedBox.setBounds (stack.removeFromTop (cellHeight));
+        stack.removeFromTop (2);
+        lengthStepper.setBounds (stack.removeFromTop (cellHeight));
+        stack.removeFromTop (2);
+        targetBox.setBounds (stack.removeFromTop (cellHeight));
+    }
+
+    area.removeFromLeft (10);
+
+    amountSlider.setBounds (area.removeFromRight (110).withSizeKeepingCentre (110, 20));
+
+    editorBounds = area.withTrimmedRight (10);
+}
+
+int AutomationLaneComponent::findPointAt (juce::Point<int> position) const noexcept
 {
     const auto& current = lane();
 
@@ -232,34 +442,17 @@ int SequencerLaneComponent::findPointAt (juce::Point<int> position) const noexce
     return best;
 }
 
-void SequencerLaneComponent::mouseDown (const juce::MouseEvent& event)
+void AutomationLaneComponent::mouseDown (const juce::MouseEvent& event)
 {
     auto& current = lane();
 
     if (! editorBounds.contains (event.getPosition()))
         return;
 
-    if (current.type == LaneType::grid)
-    {
-        const int step = stepIndexAt (event.getPosition());
-
-        if (juce::isPositiveAndBelow (step, current.length))
-        {
-            current.steps[(size_t) step] = ! current.steps[(size_t) step];
-            repaint (editorBounds);
-        }
-
-        return;
-    }
-
-    if (current.type != LaneType::modulation)
-        return;
-
     draggedPoint = findPointAt (event.getPosition());
 
     if (draggedPoint < 0 && current.numPoints < kMaxModPoints)
     {
-        // Add a point where the click landed, keeping the array sorted by position.
         const float position = juce::jlimit (0.0f, 1.0f,
             (float) (event.x - editorBounds.getX()) / (float) juce::jmax (1, editorBounds.getWidth()));
         const float value = juce::jlimit (-1.0f, 1.0f,
@@ -288,16 +481,15 @@ void SequencerLaneComponent::mouseDown (const juce::MouseEvent& event)
     repaint (editorBounds);
 }
 
-void SequencerLaneComponent::mouseDrag (const juce::MouseEvent& event)
+void AutomationLaneComponent::mouseDrag (const juce::MouseEvent& event)
 {
     auto& current = lane();
 
-    if (current.type != LaneType::modulation || draggedPoint < 0
-         || draggedPoint >= current.numPoints)
+    if (draggedPoint < 0 || draggedPoint >= current.numPoints)
         return;
 
-    // Clamp between the neighbours so the points stay ordered while one is dragged past
-    // another; re-sorting mid-drag would swap the point out from under the pointer.
+    // Clamp between the neighbours so the points stay ordered; re-sorting mid-drag would
+    // swap the point out from under the pointer.
     const float lower = draggedPoint > 0 ? current.points[(size_t) (draggedPoint - 1)].position : 0.0f;
     const float upper = draggedPoint < current.numPoints - 1
                           ? current.points[(size_t) (draggedPoint + 1)].position
@@ -313,13 +505,12 @@ void SequencerLaneComponent::mouseDrag (const juce::MouseEvent& event)
     repaint (editorBounds);
 }
 
-void SequencerLaneComponent::mouseUp (const juce::MouseEvent&)
+void AutomationLaneComponent::mouseUp (const juce::MouseEvent&)
 {
     draggedPoint = -1;
 }
 
-//==============================================================================
-void SequencerLaneComponent::paint (juce::Graphics& g)
+void AutomationLaneComponent::paint (juce::Graphics& g)
 {
     const auto bounds = getLocalBounds().toFloat().reduced (1.0f);
 
@@ -331,7 +522,6 @@ void SequencerLaneComponent::paint (juce::Graphics& g)
     const int model = processor.getSelectedModel (trackIndex);
     const auto& info = getModelInfo (juce::jlimit (0, kNumModels - 1, model));
 
-    // ---- Identity ------------------------------------------------------------
     {
         auto identity = identityArea;
 
@@ -346,88 +536,60 @@ void SequencerLaneComponent::paint (juce::Graphics& g)
                     juce::Justification::centredLeft, false);
     }
 
-    const auto& current = lane();
-
-    if (current.type == LaneType::off || editorBounds.isEmpty())
+    if (editorBounds.isEmpty())
         return;
 
-    const auto lane_ = editorBounds.toFloat();
+    const auto& current = lane();
+    const auto area = editorBounds.toFloat();
 
     g.setColour (juce::Colour (0xff101317));
-    g.fillRoundedRectangle (lane_, 3.0f);
+    g.fillRoundedRectangle (area, 3.0f);
 
-    if (current.type == LaneType::modulation)
+    if (current.speed == LaneSpeed::off)
     {
-        // ---- Breakpoint envelope ---------------------------------------------
-        g.setColour (theme::outline);
-        g.fillRect (lane_.getX(), lane_.getCentreY() - 0.5f, lane_.getWidth(), 1.0f);
-
-        const int points = current.numPoints;
-        juce::Path path;
-        bool started = false;
-
-        for (int i = 0; i < points; ++i)
-        {
-            const auto& point = current.points[(size_t) i];
-            const float x = lane_.getX() + point.position * lane_.getWidth();
-            const float y = lane_.getCentreY() - point.value * lane_.getHeight() * 0.5f;
-
-            if (! started)
-            {
-                path.startNewSubPath (x, y);
-                started = true;
-            }
-            else
-            {
-                path.lineTo (x, y);
-            }
-        }
-
-        if (started)
-        {
-            g.setColour (theme::accent.withAlpha (0.85f));
-            g.strokePath (path, juce::PathStrokeType (1.6f));
-        }
-
-        for (int i = 0; i < points; ++i)
-        {
-            const auto& point = current.points[(size_t) i];
-            const float x = lane_.getX() + point.position * lane_.getWidth();
-            const float y = lane_.getCentreY() - point.value * lane_.getHeight() * 0.5f;
-
-            g.setColour (i == draggedPoint ? theme::accent : theme::text);
-            g.fillEllipse (x - 3.5f, y - 3.5f, 7.0f, 7.0f);
-        }
-
+        g.setColour (theme::textDim);
+        g.setFont (theme::font (10.0f));
+        g.drawText ("off", editorBounds, juce::Justification::centred, false);
         return;
     }
 
-    // ---- Steps ---------------------------------------------------------------
-    const int columns = current.type == LaneType::euclidean ? current.euclideanSteps
-                                                            : current.length;
+    g.setColour (theme::outline);
+    g.fillRect (area.getX(), area.getCentreY() - 0.5f, area.getWidth(), 1.0f);
 
-    if (columns <= 0)
-        return;
+    juce::Path path;
+    bool started = false;
 
-    const float cellWidth = lane_.getWidth() / (float) columns;
-    const float inset = juce::jmin (2.0f, cellWidth * 0.15f);
-
-    for (int step = 0; step < columns; ++step)
+    for (int i = 0; i < current.numPoints; ++i)
     {
-        const bool on = current.type == LaneType::euclidean ? euclideanStepOn (step, current.pulses, current.euclideanSteps)
-                                                            : current.steps[(size_t) step];
+        const auto& point = current.points[(size_t) i];
+        const float x = area.getX() + point.position * area.getWidth();
+        const float y = area.getCentreY() - point.value * area.getHeight() * 0.5f;
 
-        // A subtle bar every four steps, so counting a long pattern is possible.
-        const bool onBeat = (step % 4) == 0;
+        if (! started)
+        {
+            path.startNewSubPath (x, y);
+            started = true;
+        }
+        else
+        {
+            path.lineTo (x, y);
+        }
+    }
 
-        g.setColour (on ? theme::accent
-                        : (onBeat ? theme::panelAlt.brighter (0.25f) : theme::panelAlt));
+    if (started)
+    {
+        g.setColour (theme::accent.withAlpha (0.85f));
+        g.strokePath (path, juce::PathStrokeType (1.6f));
+    }
 
-        g.fillRoundedRectangle (lane_.getX() + cellWidth * (float) step + inset,
-                                lane_.getY() + inset,
-                                cellWidth - inset * 2.0f,
-                                lane_.getHeight() - inset * 2.0f,
-                                2.0f);
+    for (int i = 0; i < current.numPoints; ++i)
+    {
+        const auto& point = current.points[(size_t) i];
+        const float x = area.getX() + point.position * area.getWidth();
+        const float y = area.getCentreY() - point.value * area.getHeight() * 0.5f;
+
+        g.setColour (i == draggedPoint ? theme::accent : theme::text);
+        g.fillEllipse (x - 3.5f, y - 3.5f, 7.0f, 7.0f);
     }
 }
 

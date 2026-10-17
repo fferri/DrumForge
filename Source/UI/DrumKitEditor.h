@@ -73,16 +73,17 @@ private:
 
     juce::Label kitLabel;
     MenuButton menuButton;
-    std::array<juce::TextButton, 4> tabButtons;
+    std::array<juce::TextButton, 5> tabButtons;
 
     EditorUiState uiState;
 
     std::array<std::unique_ptr<TrackStrip>, (size_t) kNumTracks> strips;
     std::array<std::unique_ptr<SequencerLaneComponent>, (size_t) kNumTracks> lanes;
+    std::array<std::unique_ptr<AutomationLaneComponent>, (size_t) kNumTracks> automationLanes;
     std::array<std::unique_ptr<ModelKnob>, 4> reverbKnobs;
 
     juce::Rectangle<int> topBarArea, titleArea, kitLabelArea, menuButtonArea,
-                        tabBarArea, hintArea, trackArea, seqArea, fxArea;
+                        tabBarArea, hintArea, trackArea, seqArea, automationArea, fxArea;
 
     /** The kit the editor last loaded, or -1 once the current sound matches no kit. */
     int currentKitIndex = -1;

@@ -141,21 +141,18 @@ void DrumKitProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
         const double beatsPerSample = bpm / (60.0 * juce::jmax (1.0, getSampleRate()));
         const double blockBeats = (double) numSamples * beatsPerSample;
 
-        std::array<LaneAction, kNumSequencerLanes> laneActions {};
-        transport.advance (sequencer, ppq, ppq + blockBeats, playing, laneActions);
+        SequencerOutput output;
+        transport.advance (sequencer, ppq, ppq + blockBeats, playing, output);
 
         for (auto& trackOffsets : sequenceOffsets)
             trackOffsets.fill (0.0f);
 
         for (int t = 0; t < kNumTracks; ++t)
         {
-            const auto& action = laneActions[(size_t) t];
-
-            if (action.trigger)
+            if (output.trigger[(size_t) t])
                 triggerTrackInternal (t, 1.0f);
 
-            if (action.modulates && juce::isPositiveAndBelow (action.target, kNumModTargets))
-                sequenceOffsets[(size_t) t][(size_t) action.target] = action.value;
+            sequenceOffsets[(size_t) t] = output.offsets[(size_t) t];
         }
     }
 

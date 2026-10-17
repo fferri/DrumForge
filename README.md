@@ -295,23 +295,18 @@ last.
 
 ### The sequencer
 
-Each track has its own lane, and each lane has its **own length and its own speed**. That
-combination is what produces polymeters: a five-step lane against a seven-step lane drifts
-against itself and comes back around. Nothing is shared between lanes.
+Every track has **one trigger sequencer**, and it is either a **grid** or a **Euclidean**
+pattern. Both share the same two controls:
 
-A lane is one of four things:
+- **Speed** — a multiplier of a 1/16 note. Bigger is faster, and **Off** stops the lane.
+- **Steps** — how many steps before the pattern repeats, 1 to 64.
 
-| Type | What it does |
-|---|---|
-| **Off** | Nothing |
-| **Grid** | A pattern of steps you click on and off, up to 32 of them |
-| **Euclidean** | Pulses spread as evenly as possible across the steps, so 3 across 8 gives `x..x..x.` |
-| **Modulation** | A breakpoint envelope that sweeps one parameter |
-
-**Speed is a multiplier of a 1/16 note**, so a bigger number is faster:
+Independent length and speed per track is what produces polymeters: a 5-step lane against a
+7-step lane at the same speed drifts and realigns on its own.
 
 | Multiplier | Step length | At 120 BPM |
 |---|---|---|
+| Off | stopped | - |
 | ×1/8 | a 1/2 note | 1000 ms |
 | ×1/4 | a 1/4 note | 500 ms |
 | ×1/3 | a 3/16 note | 375 ms |
@@ -324,19 +319,39 @@ A lane is one of four things:
 | ×8 | a 1/128 note | 15.6 ms |
 
 The odd ratios are the point: ×1/3 and ×3 give triplet feels against straight lanes on the
-same bar, which is a 3-against-4 polyrhythm without changing either lane's length.
+same bar.
 
-**Modulation lanes** are drawn by clicking to add a breakpoint and dragging it to move it.
-The envelope spans the lane's length, so a long slow lane is a slow sweep. Its **amount**
-sets how much of the parameter's travel it covers, and it is added on top of whatever the
-knob and velocity modulation are already doing.
+In **Euclidean** mode the row also shows:
 
-The sequencer follows the host's transport: it starts when you press play, and stops when you
-stop. A lane never fires on the first block after you hit play, so starting mid-bar does not
-dump a step into the buffer, and seeking past a run of steps does not fire them all at once.
+- **Trigs** — how many pulses to spread across the steps, 0 to the length.
+- **Offset** — where the pattern starts, from −length to +length. A negative offset walks it
+  backwards, which is the quickest way to get a different feel from the same pulse count.
+
+### The automation page
+
+Rhythm and movement are separate decisions, so they live on separate pages. **AUTO** gives
+each track up to **four automation lanes**, each a breakpoint envelope sweeping one
+parameter:
+
+- **Slot** — which of the track's four lanes you are editing.
+- **Speed** and **Steps** — its own, independent of the track's trigger sequencer.
+- **Target** — any of the nine per-track parameters.
+- **Amount** — how far the envelope moves it.
+
+Click in the envelope to add a breakpoint, drag one to move it. Lanes aimed at the same
+parameter add up, and the result is layered on top of whatever the knob and the velocity
+modulation are already doing.
+
+The automation page works on its own: a track can have no rhythm at all and still have its
+parameters moving.
+
+The sequencer follows the host's transport: it starts when you press play and stops when you
+stop. A lane never fires on the first block after you press play, so starting mid-bar does
+not dump a step into the buffer, and seeking past a run of steps does not fire them all at
+once.
 
 > The lanes are not yet saved with your session or with a kit — that is the next piece of
-> work. Everything else on this page is live.
+> work. Everything else on these pages is live.
 
 ---
 

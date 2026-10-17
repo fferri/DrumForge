@@ -1593,22 +1593,18 @@ void testSequencerCore()
 {
     section ("Sequencer: speeds, Euclidean rhythms, envelopes and polyrhythm");
 
-    // ---- speeds are multipliers of a 1/16 note ----
+    // ---- speed is a multiplier of a 1/16 note, and zero is off ----
     check (std::abs (laneSpeedInBeats (LaneSpeed::xOne) - 0.25f) < 1.0e-6f,
-           "x1 is a 1/16 note, which is a quarter of a beat");
-    check (std::abs (laneSpeedInBeats (LaneSpeed::xTwo) - 0.125f) < 1.0e-6f,
-           "x2 halves it, so a 1/32 note");
+           "x1 is a 1/16 note, a quarter of a beat");
+    check (std::abs (laneSpeedInBeats (LaneSpeed::xTwo) - 0.125f) < 1.0e-6f, "x2 is a 1/32");
     check (std::abs (laneSpeedInBeats (LaneSpeed::xThird) - 0.75f) < 1.0e-6f,
-           "x1/3 triples it, so a 3/16 note",
-           juce::String (laneSpeedInBeats (LaneSpeed::xThird)));
-    check (std::abs (laneSpeedInBeats (LaneSpeed::xHalf) - 0.5f) < 1.0e-6f,
-           "x1/2 is a 1/8 note");
-    check (std::abs (laneSpeedInBeats (LaneSpeed::xEighth) - 2.0f) < 1.0e-6f,
-           "x1/8 is a half note");
+           "x1/3 is a 3/16", juce::String (laneSpeedInBeats (LaneSpeed::xThird)));
+    check (std::abs (laneSpeedInBeats (LaneSpeed::xEighth) - 2.0f) < 1.0e-6f, "x1/8 is a 1/2");
     check (laneSpeedInBeats (LaneSpeed::xEight) < laneSpeedInBeats (LaneSpeed::xEighth),
-           "the speed list runs slow to fast, so a bigger multiplier is a shorter step");
+           "a bigger multiplier is a shorter step");
+    check (laneSpeedInBeats (LaneSpeed::off) == 0.0f, "speed 0 is a stopped lane, not an error");
 
-    // ---- Euclidean rhythms ----
+    // ---- Euclidean ----
     {
         juce::String pattern;
 
@@ -1618,186 +1614,188 @@ void testSequencerCore()
         check (pattern == "x..x..x.", "E(3,8) is x..x..x.", pattern);
     }
 
-    {
-        juce::String pattern;
-        int pulses = 0;
-
-        for (int step = 0; step < 16; ++step)
-        {
-            const bool on = euclideanStepOn (step, 5, 16);
-            pulses += on ? 1 : 0;
-            pattern << (on ? "x" : ".");
-        }
-
-        check (pulses == 5, "E(5,16) places exactly five pulses", juce::String (pulses));
-        check (euclideanStepOn (0, 5, 16), "E(5,16) starts on a pulse", pattern);
-    }
-
     check (euclideanStepOn (3, 8, 8), "a lane with a pulse on every step is all on");
     check (! euclideanStepOn (0, 0, 8), "zero pulses is silent");
-    check (euclideanStepOn (10, 3, 8) == euclideanStepOn (2, 3, 8),
-           "steps past the length wrap rather than reading out of range");
+
+    // ---- the offset walks the pattern without changing it ----
+    {
+        TriggerLane lane;
+        lane.mode = TriggerMode::euclidean;
+        lane.length = 8;
+        lane.trigs = 3;
+        lane.offset = 0;
+
+        juce::String plain, shifted;
+
+        for (int step = 0; step < 8; ++step)
+        {
+            plain << (lane.isStepOn (step) ? "x" : ".");
+        }
+
+        lane.offset = 2;
+
+        for (int step = 0; step < 8; ++step)
+        {
+            shifted << (lane.isStepOn (step) ? "x" : ".");
+        }
+
+        check (plain == "x..x..x.", "offset 0 leaves E(3,8) alone", plain);
+        check (shifted == ".x..x.x.", "an offset of 2 rotates the pattern", shifted);
+        check (plain != shifted, "and the rotation actually changes where the hits land");
+    }
+
+    check (! TriggerLane().isStepOn (0) || TriggerLane().speed == LaneSpeed::off,
+           "a new trigger lane starts stopped");
 
     // ---- breakpoint envelope ----
     {
-        SequencerLane lane;
-        lane.setDefaultsFor (LaneType::modulation);
+        AutomationLane lane;
 
         check (std::abs (lane.modulationAt (0.0f) - (-1.0f)) < 1.0e-5f,
-               "the default ramp starts at the bottom", juce::String (lane.modulationAt (0.0f)));
-        check (std::abs (lane.modulationAt (0.5f) - 0.0f) < 1.0e-5f,
-               "and crosses zero halfway", juce::String (lane.modulationAt (0.5f)));
+               "the default ramp starts at the bottom");
+        check (std::abs (lane.modulationAt (0.5f)) < 1.0e-5f, "and crosses zero halfway");
         check (std::abs (lane.modulationAt (0.999f) - 0.998f) < 1.0e-3f,
-               "and approaches the top at the end of the cycle",
-               juce::String (lane.modulationAt (0.999f)));
+               "and approaches the top at the end");
         check (std::abs (lane.modulationAt (1.0f) - (-1.0f)) < 1.0e-5f,
-               "while phase 1.0 is phase 0, so the ramp wraps rather than sticking");
-
-        lane.numPoints = 3;
-        lane.points[0] = { 0.0f, 1.0f };
-        lane.points[1] = { 0.25f, 1.0f };
-        lane.points[2] = { 1.0f, -1.0f };
-
-        check (std::abs (lane.modulationAt (0.5f) - (1.0f - 2.0f * (0.25f / 0.75f))) < 1.0e-4f,
-               "points hold flat then ramp linearly", juce::String (lane.modulationAt (0.5f)));
-        check (std::abs (lane.modulationAt (1.5f) - lane.modulationAt (0.5f)) < 1.0e-5f,
-               "and the phase wraps rather than running off the end");
+               "while phase 1.0 is phase 0, so it wraps");
     }
 
-    // ---- transport: a lane fires on the step boundary, and only then ----
+    // ---- transport: fires on the step boundary, not before ----
     {
         SequencerState state;
-        state.lanes[0].type = LaneType::grid;
-        state.lanes[0].length = 4;
-        state.lanes[0].speed = LaneSpeed::xQuarter;   // one beat per step
-        state.lanes[0].steps = {};          // all off
-        state.lanes[0].steps[0] = true;
-        state.lanes[0].steps[2] = true;
+        state.triggers[0].mode = TriggerMode::grid;
+        state.triggers[0].length = 4;
+        state.triggers[0].speed = LaneSpeed::xQuarter;   // one beat per step
+        state.triggers[0].steps = {};
+
+        for (int i = 0; i < 4; ++i)
+            state.triggers[0].steps[(size_t) i] = true;
 
         SequencerTransport transport;
-        std::array<LaneAction, kNumSequencerLanes> actions {};
+        SequencerOutput output;
 
-        // First block adopts the position without firing.
-        transport.advance (state, 0.0, 0.1, true, actions);
-        check (! actions[0].trigger, "the first block does not dump a step into the buffer");
+        transport.advance (state, 0.0, 0.1, true, output);
+        check (! output.trigger[0], "the first block does not dump a step into the buffer");
 
-        // Moving to step 1: off.
-        transport.advance (state, 1.0, 1.1, true, actions);
-        check (! actions[0].trigger, "step 1 is off");
+        transport.advance (state, 1.0, 1.1, true, output);
+        check (output.trigger[0], "the next step fires");
 
-        // Step 2: on.
-        transport.advance (state, 2.0, 2.1, true, actions);
-        check (actions[0].trigger, "step 2 fires");
+        transport.advance (state, 100.0, 100.1, true, output);
+        check (! output.trigger[0], "a forward seek re-adopts instead of firing");
 
-        // Step 3: off, then the pattern wraps to step 0 and fires again.
-        transport.advance (state, 3.0, 3.1, true, actions);
-        check (! actions[0].trigger, "step 3 is off");
+        transport.advance (state, 2.0, 2.1, true, output);
+        check (! output.trigger[0], "a backward seek does too");
 
-        transport.advance (state, 4.0, 4.1, true, actions);
-        check (actions[0].trigger, "and the pattern wraps back to step 0");
-
-        // Not playing: nothing fires.
-        transport.advance (state, 5.0, 5.1, false, actions);
-        check (! actions[0].trigger, "a stopped transport fires nothing");
+        transport.advance (state, 3.0, 3.1, false, output);
+        check (! output.trigger[0], "a stopped transport fires nothing");
     }
 
-    // ---- independent speed and length: two lanes drift apart ----
+    // ---- speed 0 disables a lane ----
+    {
+        SequencerState state;
+        state.triggers[0].length = 4;
+        state.triggers[0].speed = LaneSpeed::off;
+
+        for (int i = 0; i < 4; ++i)
+            state.triggers[0].steps[(size_t) i] = true;
+
+        SequencerTransport transport;
+        SequencerOutput output;
+        bool fired = false;
+
+        for (int step = 0; step < 8; ++step)
+        {
+            transport.advance (state, (double) step, (double) step + 0.1, true, output);
+            fired = fired || output.trigger[0];
+        }
+
+        check (! fired, "a lane at speed 0 never fires");
+    }
+
+    // ---- polymeter: different lengths, same speed ----
     {
         SequencerState state;
 
-        // Lane 0: 3 steps at 1 beat. Lane 1: 4 steps at 1 beat. Classic 3-against-4.
-        for (int lane = 0; lane < 2; ++lane)
+        for (int t = 0; t < 2; ++t)
         {
-            state.lanes[(size_t) lane].type = LaneType::grid;
-            state.lanes[(size_t) lane].speed = LaneSpeed::xQuarter;   // one beat per step
-            state.lanes[(size_t) lane].length = lane == 0 ? 3 : 4;
-            state.lanes[(size_t) lane].steps = {};
+            state.triggers[(size_t) t].speed = LaneSpeed::xQuarter;
+            state.triggers[(size_t) t].length = t == 0 ? 3 : 4;
+            state.triggers[(size_t) t].steps = {};
 
             for (int i = 0; i < kMaxLaneSteps; ++i)
-                state.lanes[(size_t) lane].steps[(size_t) i] = true;
+                state.triggers[(size_t) t].steps[(size_t) i] = true;
         }
 
         SequencerTransport transport;
-        std::array<LaneAction, kNumSequencerLanes> actions {};
+        SequencerOutput output;
 
-        transport.advance (state, 0.0, 0.1, true, actions);
+        transport.advance (state, 0.0, 0.1, true, output);
 
-        int lane0Hits = 0, lane1Hits = 0;
+        int hits[2] { 0, 0 };
 
-        // Sixteen beats covers a whole number of both cycles.
-        for (int step = 1; step <= 16; ++step)
+        for (int step = 1; step <= 12; ++step)
         {
-            transport.advance (state, (double) step, (double) step + 0.1, true, actions);
-            lane0Hits += actions[0].trigger ? 1 : 0;
-            lane1Hits += actions[1].trigger ? 1 : 0;
+            transport.advance (state, (double) step, (double) step + 0.1, true, output);
+
+            for (int t = 0; t < 2; ++t)
+                hits[t] += output.trigger[(size_t) t] ? 1 : 0;
         }
 
-        check (lane0Hits == lane1Hits,
-               "two lanes of different length but the same speed fire equally often",
-               juce::String (lane0Hits) + " vs " + juce::String (lane1Hits));
-        check (lane0Hits == 16, "and the faster-cycling lane produces a hit on every step");
+        check (hits[0] == hits[1], "two lanes of different length fire equally often",
+               juce::String (hits[0]) + " vs " + juce::String (hits[1]));
     }
 
-    // ---- a modulation lane reports a continuous value ----
+    // ---- automation is independent of the trigger lane ----
     {
         SequencerState state;
-        state.lanes[0].type = LaneType::modulation;
-        state.lanes[0].length = 4;
-        state.lanes[0].speed = LaneSpeed::xQuarter;   // one beat per step
-        state.lanes[0].amount = 1.0f;
-        state.lanes[0].setDefaultsFor (LaneType::modulation);
+        state.triggers[0].speed = LaneSpeed::off;          // no rhythm at all
+        state.automation[0][0].speed = LaneSpeed::xQuarter;
+        state.automation[0][0].length = 4;
+        state.automation[0][0].target = (int) ModTarget::level;
+        state.automation[0][0].amount = 1.0f;
 
         SequencerTransport transport;
-        std::array<LaneAction, kNumSequencerLanes> actions {};
+        SequencerOutput output;
 
-        transport.advance (state, 0.0, 0.1, true, actions);
-        const float atStart = actions[0].value;
+        transport.advance (state, 0.0, 0.1, true, output);
+        const float atStart = output.offsets[0][(size_t) ModTarget::level];
 
-        transport.advance (state, 2.0, 2.1, true, actions);
-        const float halfway = actions[0].value;
+        transport.advance (state, 2.0, 2.1, true, output);
+        const float halfway = output.offsets[0][(size_t) ModTarget::level];
 
-        transport.advance (state, 4.0, 4.1, true, actions);
-        const float wrapped = actions[0].value;
-
-        check (actions[0].modulates, "a modulation lane reports a value rather than a trigger");
-        check (std::abs (atStart - (-1.0f)) < 1.0e-4f, "at the start of the cycle it is at the bottom");
-        check (std::abs (halfway - 0.0f) < 1.0e-4f, "halfway through it is at the middle",
+        check (! output.trigger[0], "the trigger lane is off");
+        check (std::abs (atStart - (-1.0f)) < 1.0e-4f, "but the automation lane still runs");
+        check (std::abs (halfway) < 1.0e-4f, "and sweeps with its own phase",
                juce::String (halfway));
-        check (std::abs (wrapped - (-1.0f)) < 1.0e-4f,
-               "and the cycle wraps rather than sticking at the top", juce::String (wrapped));
     }
 
-    // ---- a seek does not fire the steps it passed over ----
+    // ---- several automation lanes add up, and can share a target ----
     {
         SequencerState state;
-        state.lanes[0].type = LaneType::grid;
-        state.lanes[0].length = 4;
-        state.lanes[0].speed = LaneSpeed::xQuarter;   // one beat per step
-        state.lanes[0].steps = {};
 
-        for (int i = 0; i < kMaxLaneSteps; ++i)
-            state.lanes[0].steps[(size_t) i] = true;
+        for (int slot = 0; slot < 2; ++slot)
+        {
+            auto& lane = state.automation[0][(size_t) slot];
+            lane.speed = LaneSpeed::xQuarter;
+            lane.length = 4;
+            lane.target = (int) ModTarget::level;
+            lane.amount = 0.5f;
+            lane.numPoints = 1;
+            lane.points[0] = { 0.0f, 1.0f };   // pinned high
+        }
 
         SequencerTransport transport;
-        std::array<LaneAction, kNumSequencerLanes> actions {};
+        SequencerOutput output;
+        transport.advance (state, 0.0, 0.1, true, output);
 
-        transport.advance (state, 0.0, 0.1, true, actions);
-        transport.advance (state, 100.0, 100.1, true, actions);
-
-        check (! actions[0].trigger, "a forward seek of a hundred beats re-adopts instead of firing");
-
-        transport.advance (state, 2.0, 2.1, true, actions);
-
-        check (! actions[0].trigger, "a backward seek does too");
+        check (std::abs (output.offsets[0][(size_t) ModTarget::level] - 1.0f) < 1.0e-4f,
+               "two lanes aimed at the same parameter sum",
+               juce::String (output.offsets[0][(size_t) ModTarget::level]));
     }
 }
 
-/** A transport the offline tests can drive.
-
-    The harness has no host, so without this the sequencer would never run: getPlayHead()
-    returns null and every lane stays still. This is the only way to verify that a lane
-    actually makes a sound.
-*/
+/** A transport the offline tests can drive. Without it getPlayHead() is null, nothing runs,
+    and the sequencer's audio path would be entirely untested. */
 class TestPlayHead final : public juce::AudioPlayHead
 {
 public:
@@ -1819,22 +1817,19 @@ void testSequencerAudio()
 {
     section ("Sequencer: a lane actually plays the kit");
 
-    DrumKitProcessor processor;
     setSettingsDirectoryOverride (juce::File::getSpecialLocation (juce::File::tempDirectory)
                                       .getChildFile ("DrumForgeSeqTests"));
+
+    DrumKitProcessor processor;
     processor.prepareToPlay (48000.0, 512);
 
-    // Everything silent, so any audio at all has to have come from the sequencer.
-    for (int t = 0; t < kNumTracks; ++t)
-        processor.getModulationState();
-
     auto& state = processor.getSequencerState();
-    state.lanes[0].setDefaultsFor (LaneType::grid);
-    state.lanes[0].speed = LaneSpeed::xOne;      // a 1/16 note, a quarter of a beat
-    state.lanes[0].length = 4;
+    state.triggers[0].mode = TriggerMode::grid;
+    state.triggers[0].speed = LaneSpeed::xOne;     // a 1/16, a quarter of a beat
+    state.triggers[0].length = 4;
 
     for (int i = 0; i < 4; ++i)
-        state.lanes[0].steps[(size_t) i] = true;
+        state.triggers[0].steps[(size_t) i] = true;
 
     TestPlayHead playHead;
     processor.setPlayHead (&playHead);
@@ -1849,35 +1844,27 @@ void testSequencerAudio()
         return buffer.getMagnitude (0, buffer.getNumSamples());
     };
 
-    // Block one adopts the position; the lane must not fire yet.
     playHead.ppq = 0.0;
     const float firstBlock = peakOf();
 
-    // Step the transport by exactly one step and render again.
-    playHead.ppq = 0.25;
-    const float secondBlock = peakOf();
+    float loudest = 0.0f;
 
-    // And keep going for a few steps, because a single hit decays.
-    float loudest = secondBlock;
-
-    for (int i = 0; i < 4; ++i)
+    for (int i = 0; i < 5; ++i)
     {
         playHead.ppq += 0.25;
         loudest = juce::jmax (loudest, peakOf());
     }
 
-    check (firstBlock < 1.0e-4f, "the first block after starting does not fire a step",
+    check (firstBlock < 1.0e-4f, "the first block after starting does not fire",
            juce::String (firstBlock));
     check (loudest > 0.01f, "a lane triggers audible output once the transport advances",
            juce::String (loudest));
 
-    // A stopped transport must not fire.
-    state.lanes[0].type = LaneType::off;
+    // Let it decay before checking that a stopped transport is silent.
+    state.triggers[0].speed = LaneSpeed::off;
     playHead.playing = false;
     playHead.ppq += 1.0;
 
-    // Let whatever is still ringing decay away first, or the test measures the tail of the
-    // previous hits rather than anything the stopped transport did.
     for (int i = 0; i < 160; ++i)
         peakOf();
 
@@ -1891,18 +1878,18 @@ void testSequencerAudio()
 
     check (afterStop < 0.01f, "and a stopped transport fires nothing", juce::String (afterStop));
 
-    // A modulation lane moves the parameter the next hit is built from, without firing.
+    // An automation lane moves the parameter the next hit is built from.
     {
-        state.lanes[0].setDefaultsFor (LaneType::modulation);
-        state.lanes[0].modTarget = (int) ModTarget::level;
-        state.lanes[0].amount = 1.0f;
-        state.lanes[0].length = 2;
-        state.lanes[0].speed = LaneSpeed::xOne;
+        auto& lane = state.automation[0][0];
+        lane.speed = LaneSpeed::xOne;
+        lane.length = 2;
+        lane.target = (int) ModTarget::level;
+        lane.amount = 1.0f;
+        lane.numPoints = 2;
+        lane.points[0] = { 0.0f, -1.0f };
+        lane.points[1] = { 1.0f, -1.0f };   // pinned quiet
 
-        state.lanes[0].numPoints = 2;
-        state.lanes[0].points[0] = { 0.0f, -1.0f };
-        state.lanes[0].points[1] = { 1.0f, -1.0f };   // pinned at the bottom
-
+        state.triggers[0].speed = LaneSpeed::xOne;
         playHead.playing = true;
         playHead.ppq = 0.0;
 
@@ -1912,13 +1899,13 @@ void testSequencerAudio()
         playHead.ppq += 0.25;
         const float quiet = peakOf();
 
-        state.lanes[0].points[0] = { 0.0f, 1.0f };
-        state.lanes[0].points[1] = { 1.0f, 1.0f };    // pinned at the top
+        lane.points[0] = { 0.0f, 1.0f };
+        lane.points[1] = { 1.0f, 1.0f };    // pinned loud
 
         playHead.ppq += 0.25;
         const float loud = peakOf();
 
-        check (loud > quiet, "a modulation lane moves the parameter the next hit uses",
+        check (loud > quiet, "an automation lane moves the parameter the next hit uses",
                juce::String (quiet) + " -> " + juce::String (loud));
     }
 

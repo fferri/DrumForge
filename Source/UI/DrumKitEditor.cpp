@@ -12,6 +12,7 @@ namespace
             case EditorUiState::Mode::synth: return "SYNTH";
             case EditorUiState::Mode::mod:   return "MOD";
             case EditorUiState::Mode::seq:   return "SEQ";
+            case EditorUiState::Mode::automation: return "AUTO";
             case EditorUiState::Mode::fx:    return "FX";
         }
 
@@ -67,6 +68,9 @@ DrumKitEditor::DrumKitEditor (DrumKitProcessor& owner)
     {
         lanes[(size_t) t] = std::make_unique<SequencerLaneComponent> (kit(), t);
         addAndMakeVisible (*lanes[(size_t) t]);
+
+        automationLanes[(size_t) t] = std::make_unique<AutomationLaneComponent> (kit(), t);
+        addAndMakeVisible (*automationLanes[(size_t) t]);
     }
 
     // ---- Global knobs --------------------------------------------------------
@@ -138,6 +142,9 @@ void DrumKitEditor::setMode (EditorUiState::Mode mode)
     for (auto& lane : lanes)
         lane->refreshFromProcessor();
 
+    for (auto& lane : automationLanes)
+        lane->refreshFromProcessor();
+
     resized();
     repaint();
 }
@@ -156,6 +163,9 @@ void DrumKitEditor::updateContentVisibility()
 
     for (auto& lane : lanes)
         lane->setVisible (mode == EditorUiState::Mode::seq);
+
+    for (auto& lane : automationLanes)
+        lane->setVisible (mode == EditorUiState::Mode::automation);
 }
 
 //==============================================================================
@@ -192,6 +202,7 @@ void DrumKitEditor::resized()
     // ---- Content -------------------------------------------------------------
     trackArea = area.reduced (10, 8);
     seqArea = trackArea;
+    automationArea = trackArea;
     fxArea = trackArea;
 
     {
@@ -216,6 +227,11 @@ void DrumKitEditor::resized()
                                       seqArea.getY() + t * rowHeight,
                                       seqArea.getWidth(),
                                       rowHeight);
+
+        automationLanes[(size_t) t]->setBounds (automationArea.getX(),
+                                                automationArea.getY() + t * rowHeight,
+                                                automationArea.getWidth(),
+                                                rowHeight);
     }
 }
 

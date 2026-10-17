@@ -1,9 +1,8 @@
 #include "Sequencer.h"
 
-#include <algorithm>
+#include <cmath>
 
 #include <juce_core/juce_core.h>
-#include <cmath>
 
 namespace df
 {
@@ -12,6 +11,7 @@ float laneSpeedMultiplier (LaneSpeed speed) noexcept
 {
     switch (speed)
     {
+        case LaneSpeed::off:      return 0.0f;
         case LaneSpeed::xEighth:  return 0.125f;
         case LaneSpeed::xQuarter: return 0.25f;
         case LaneSpeed::xThird:   return 1.0f / 3.0f;
@@ -24,20 +24,22 @@ float laneSpeedMultiplier (LaneSpeed speed) noexcept
         case LaneSpeed::xEight:   return 8.0f;
     }
 
-    return 1.0f;
+    return 0.0f;
 }
 
 float laneSpeedInBeats (LaneSpeed speed) noexcept
 {
     // A step is a 1/16 note (a quarter of a beat) divided by the multiplier, so a larger
-    // multiplier gives a shorter step. 4 is a whole note in quarter notes, hence 0.25.
-    return 0.25f / laneSpeedMultiplier (speed);
+    // multiplier gives a shorter step. Zero means stopped, not infinitely fast.
+    const float multiplier = laneSpeedMultiplier (speed);
+    return multiplier <= 0.0f ? 0.0f : 0.25f / multiplier;
 }
 
 const char* laneSpeedName (LaneSpeed speed) noexcept
 {
     switch (speed)
     {
+        case LaneSpeed::off:      return "Off";
         case LaneSpeed::xEighth:  return "x1/8";
         case LaneSpeed::xQuarter: return "x1/4";
         case LaneSpeed::xThird:   return "x1/3";
@@ -50,20 +52,18 @@ const char* laneSpeedName (LaneSpeed speed) noexcept
         case LaneSpeed::xEight:   return "x8";
     }
 
-    return "x1";
+    return "Off";
 }
 
-const char* laneTypeName (LaneType type) noexcept
+const char* triggerModeName (TriggerMode mode) noexcept
 {
-    switch (type)
+    switch (mode)
     {
-        case LaneType::off:        return "Off";
-        case LaneType::grid:       return "Grid";
-        case LaneType::euclidean:  return "Euclidean";
-        case LaneType::modulation: return "Modulation";
+        case TriggerMode::grid:      return "Grid";
+        case TriggerMode::euclidean: return "Euclidean";
     }
 
-    return "Off";
+    return "Grid";
 }
 
 bool euclideanStepOn (int step, int pulses, int steps) noexcept
@@ -78,57 +78,62 @@ bool euclideanStepOn (int step, int pulses, int steps) noexcept
     return (wrapped * pulses) % steps < pulses;
 }
 
-void SequencerLane::setDefaultsFor (LaneType newType) noexcept
+//==============================================================================
+TriggerLane::TriggerLane() noexcept
 {
-    type = newType;
+    setDefaultsFor (TriggerMode::grid);
+}
 
-    switch (newType)
+void TriggerLane::setDefaultsFor (TriggerMode newMode) noexcept
+{
+    mode = newMode;
+
+    if (newMode == TriggerMode::grid)
     {
-        case LaneType::off:
-            break;
-
-        case LaneType::grid:
-            // Four on the floor, so a new lane is immediately audible and obviously alive.
-            for (int i = 0; i < kMaxLaneSteps; ++i)
-                steps[(size_t) i] = (i % 4) == 0;
-            break;
-
-        case LaneType::euclidean:
-            pulses = 4;
-            euclideanSteps = 8;
-            break;
-
-        case LaneType::modulation:
-            // A ramp, which is the clearest thing to see and the easiest to hear as a sweep.
-            numPoints = 2;
-            points[0] = { 0.0f, -1.0f };
-            points[1] = { 1.0f, 1.0f };
-            break;
+        // Four on the floor, so a new lane is immediately audible and obviously alive.
+        for (int i = 0; i < kMaxLaneSteps; ++i)
+            steps[(size_t) i] = (i % 4) == 0;
+    }
+    else
+    {
+        trigs = juce::jlimit (0, length, 4);
+        offset = 0;
     }
 }
 
-bool SequencerLane::isStepOn (int step) const noexcept
+bool TriggerLane::isStepOn (int step) const noexcept
 {
-    switch (type)
+    if (length <= 0 || step < 0)
+        return false;
+
+    if (mode == TriggerMode::euclidean)
     {
-        case LaneType::off:
-        case LaneType::modulation:
-            return false;
-
-        case LaneType::grid:
-            if (step < 0 || step >= length)
-                return false;
-
-            return steps[(size_t) step];
-
-        case LaneType::euclidean:
-            return euclideanStepOn (step, pulses, euclideanSteps);
+        // The offset shifts where the pattern starts, in either direction.
+        const int shifted = step + offset;
+        return euclideanStepOn (((shifted % length) + length) % length,
+                                juce::jlimit (0, length, trigs), length);
     }
 
-    return false;
+    if (step >= length)
+        return false;
+
+    return steps[(size_t) step];
 }
 
-float SequencerLane::modulationAt (float phase) const noexcept
+//==============================================================================
+AutomationLane::AutomationLane() noexcept
+{
+    setDefaultShape();
+}
+
+void AutomationLane::setDefaultShape() noexcept
+{
+    numPoints = 2;
+    points[0] = { 0.0f, -1.0f };
+    points[1] = { 1.0f, 1.0f };
+}
+
+float AutomationLane::modulationAt (float phase) const noexcept
 {
     if (numPoints <= 0)
         return 0.0f;
@@ -138,7 +143,6 @@ float SequencerLane::modulationAt (float phase) const noexcept
 
     const float wrapped = phase - std::floor (phase);
 
-    // Points are kept sorted by position, so a linear scan is enough for at most 16 of them.
     if (wrapped <= points[0].position)
         return points[0].value;
 
@@ -162,6 +166,7 @@ float SequencerLane::modulationAt (float phase) const noexcept
     return points[(size_t) (numPoints - 1)].value;
 }
 
+//==============================================================================
 void SequencerTransport::reset() noexcept
 {
     lastStep.fill (0.0);
@@ -169,86 +174,74 @@ void SequencerTransport::reset() noexcept
 }
 
 void SequencerTransport::advance (const SequencerState& state, double ppqStart, double ppqEnd,
-                                  bool playing, std::array<LaneAction, kNumSequencerLanes>& out) noexcept
+                                  bool playing, SequencerOutput& out) noexcept
 {
-    juce::ignoreUnused (ppqEnd);   // the block end is only needed for sub-block resolution
-    for (auto& action : out)
-        action = LaneAction {};
+    juce::ignoreUnused (ppqEnd);
 
-    if (! playing)
+    for (auto& triggered : out.trigger)
+        triggered = false;
+
+    for (auto& trackOffsets : out.offsets)
+        trackOffsets.fill (0.0f);
+
+    // ---- Automation lanes run whether or not the transport does -------------------------
+    // A stopped transport freezes them at their current phase rather than resetting them, so
+    // an automated parameter does not snap back to its knob position the moment you stop.
+    for (int t = 0; t < kNumTracks; ++t)
     {
-        // Hold the lanes where they are. A modulation lane still reports its value so an
-        // automated parameter does not snap back to its knob position the moment the
-        // transport stops. Priming is dropped so resuming re-adopts the position instead of
-        // firing everything that was missed while stopped.
-        for (int i = 0; i < kNumSequencerLanes; ++i)
+        for (const auto& lane : state.automation[(size_t) t])
         {
-            const auto& lane = state.lanes[(size_t) i];
-            primed[(size_t) i] = false;
+            const double beatsPerStep = (double) laneSpeedInBeats (lane.speed);
 
-            if (lane.type == LaneType::modulation && lane.length > 0)
-            {
-                const double steps = ppqStart / (double) laneSpeedInBeats (lane.speed);
-                const double cycle = steps / (double) lane.length;
-                const float phase = (float) (cycle - std::floor (cycle));
+            if (beatsPerStep <= 0.0 || lane.length <= 0)
+                continue;
 
-                out[(size_t) i].modulates = true;
-                out[(size_t) i].target = lane.modTarget;
-                out[(size_t) i].value = lane.modulationAt (phase) * lane.amount;
-            }
+            const double steps = ppqStart / beatsPerStep;
+            const double cycle = steps / (double) lane.length;
+            const float phase = (float) (cycle - std::floor (cycle));
+
+            if (juce::isPositiveAndBelow (lane.target, kNumModTargets))
+                out.offsets[(size_t) t][(size_t) lane.target]
+                    += lane.modulationAt (phase) * lane.amount;
         }
-
-        return;
     }
 
-    for (int i = 0; i < kNumSequencerLanes; ++i)
+    // ---- Trigger lanes -----------------------------------------------------------------
+    for (int t = 0; t < kNumTracks; ++t)
     {
-        const auto& lane = state.lanes[(size_t) i];
+        const auto& lane = state.triggers[(size_t) t];
+        const double beatsPerStep = (double) laneSpeedInBeats (lane.speed);
 
-        if (lane.type == LaneType::off || lane.length <= 0)
+        if (! playing || beatsPerStep <= 0.0 || lane.length <= 0)
         {
-            primed[(size_t) i] = false;
+            primed[(size_t) t] = false;
             continue;
         }
 
-        const double beatsPerStep = (double) laneSpeedInBeats (lane.speed);
         const double stepAtStart = ppqStart / beatsPerStep;
         const long long currentStep = (long long) std::floor (stepAtStart);
 
-        if (lane.type == LaneType::modulation)
-        {
-            const double cycle = stepAtStart / (double) lane.length;
-            const float phase = (float) (cycle - std::floor (cycle));
-
-            out[(size_t) i].modulates = true;
-            out[(size_t) i].target = lane.modTarget;
-            out[(size_t) i].value = lane.modulationAt (phase) * lane.amount;
-            continue;
-        }
-
-        if (! primed[(size_t) i])
+        if (! primed[(size_t) t])
         {
             // First block after a start or a relocate. Adopt the position without firing, so
             // pressing play mid-bar does not dump a step into the buffer.
-            lastStep[(size_t) i] = (double) currentStep;
-            primed[(size_t) i] = true;
+            lastStep[(size_t) t] = (double) currentStep;
+            primed[(size_t) t] = true;
         }
-        else if (std::abs ((double) currentStep - lastStep[(size_t) i]) > 4.0)
+        else if (std::abs ((double) currentStep - lastStep[(size_t) t]) > 4.0)
         {
-            // The step index jumped much further than any single block could advance, in
-            // either direction: the host seeked. Re-adopt rather than firing everything the
-            // seek passed over. Four steps is far beyond a block at the fastest speed - a
-            // 2048-sample buffer at 120 BPM advances well under one step even at 1/8 beat.
-            lastStep[(size_t) i] = (double) currentStep;
+            // A jump far beyond what any block could advance, in either direction: the host
+            // seeked. Re-adopt rather than firing everything the seek passed over.
+            lastStep[(size_t) t] = (double) currentStep;
         }
-        else if (currentStep != (long long) lastStep[(size_t) i])
+        else if (currentStep != (long long) lastStep[(size_t) t])
         {
-            lastStep[(size_t) i] = (double) currentStep;
+            lastStep[(size_t) t] = (double) currentStep;
 
             const int wrapped = (int) (((currentStep % lane.length) + lane.length) % lane.length);
 
             if (lane.isStepOn (wrapped))
-                out[(size_t) i].trigger = true;
+                out.trigger[(size_t) t] = true;
         }
     }
 }
