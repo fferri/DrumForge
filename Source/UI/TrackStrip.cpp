@@ -6,100 +6,13 @@ namespace df
 {
 
 //==============================================================================
-void PadButton::setAccentColour (juce::Colour newAccent)
-{
-    if (accent == newAccent)
-        return;
-
-    accent = newAccent;
-    repaint();
-}
-
-void PadButton::setSubtitle (juce::String newSubtitle)
-{
-    if (subtitle == newSubtitle)
-        return;
-
-    subtitle = std::move (newSubtitle);
-    repaint();
-}
-
-void PadButton::setTitle (juce::String newTitle)
-{
-    if (title == newTitle)
-        return;
-
-    title = std::move (newTitle);
-    repaint();
-}
-
-void PadButton::paint (juce::Graphics& g)
-{
-    const auto bounds = getLocalBounds().toFloat().reduced (0.5f);
-    constexpr float corner = 5.0f;
-
-    auto top = accent.withMultipliedBrightness (0.42f + glow * 0.95f);
-    auto bottom = accent.withMultipliedBrightness (0.16f + glow * 0.60f);
-
-    if (pressed)
-    {
-        top = top.brighter (0.25f);
-        bottom = bottom.brighter (0.25f);
-    }
-
-    g.setGradientFill (juce::ColourGradient (top, bounds.getCentreX(), bounds.getY(),
-                                             bottom, bounds.getCentreX(), bounds.getBottom(), false));
-    g.fillRoundedRectangle (bounds, corner);
-
-    g.setColour (accent.withAlpha (0.30f + 0.65f * glow));
-    g.drawRoundedRectangle (bounds, corner, 1.0f);
-
-    auto textArea = getLocalBounds();
-
-    g.setColour (juce::Colours::white.withAlpha (0.55f + 0.45f * glow));
-    g.setFont (theme::font (juce::jlimit (8.5f, 12.0f, bounds.getHeight() * 0.30f), juce::Font::bold));
-    g.drawText (subtitle.toUpperCase(), textArea.removeFromTop ((int) (bounds.getHeight() * 0.60f)),
-                juce::Justification::centred, false);
-
-    g.setColour (juce::Colours::white.withAlpha (0.32f + 0.4f * glow));
-    g.setFont (theme::font (juce::jlimit (7.0f, 10.0f, bounds.getHeight() * 0.23f)));
-    g.drawText (title, textArea, juce::Justification::centred, false);
-}
-
-void PadButton::mouseDown (const juce::MouseEvent& event)
-{
-    if (event.mods.isPopupMenu())
-        return;      // the settings that used to live here are in the main menu now
-
-    pressed = true;
-    glow = 1.0f;
-
-    if (onHit != nullptr)
-    {
-        const float position = juce::jlimit (0.0f, 1.0f,
-                                             (float) event.position.y / (float) juce::jmax (1, getHeight()));
-        onHit (0.4f + 0.6f * position);
-    }
-
-    repaint();
-}
-
-void PadButton::mouseUp (const juce::MouseEvent&)
-{
-    pressed = false;
-    repaint();
-}
-
 //==============================================================================
 TrackStrip::TrackStrip (DrumKitProcessor& owner, int index, EditorUiState& state)
-    : processor (owner), trackIndex (index), uiState (state)
+    : processor (owner), trackIndex (index), uiState (state), header (owner, index)
 {
     const auto id = [this] (const char* name) { return pid::track (trackIndex, name); };
 
     // ---- Pad ----------------------------------------------------------------
-    pad.setTitle (juce::String (trackIndex + 1));
-    pad.onHit = [this] (float velocity) { processor.triggerTrack (trackIndex, velocity); };
-    addAndMakeVisible (pad);
 
     // ---- Engine selector ----------------------------------------------------
     for (int m = 0; m < kNumModels; ++m)
@@ -187,9 +100,8 @@ TrackStrip::TrackStrip (DrumKitProcessor& owner, int index, EditorUiState& state
     };
     addAndMakeVisible (randomiseButton);
 
-    displayedNoteMap = processor.getNoteMap();
-    noteLabel = juce::MidiMessage::getMidiNoteName (primaryNoteForTrack (trackIndex, displayedNoteMap), true, true, 3)
-                  + "  " + juce::String (primaryNoteForTrack (trackIndex, displayedNoteMap));
+    addAndMakeVisible (header);
+
 
 
 
@@ -220,10 +132,6 @@ void TrackStrip::updateModelDependentUi()
 
     modelBox.setSelectedId (model + 1, juce::dontSendNotification);
 
-    pad.setAccentColour (accent);
-    pad.setSubtitle (info.name);
-    pad.setTooltip (juce::String (info.name) + ": " + info.description
-                      + "\nClick velocity follows the vertical position on the pad.");
 
     decayKnob->setDisplayName (info.decayLabel);
     toneKnob->setDisplayName (info.toneLabel);
@@ -249,33 +157,12 @@ void TrackStrip::updateFromProcessor()
         updateModelDependentUi();
     }
 
-    // The note number in the header has to follow the selected map. This belongs here, on
-    // the timer, not in the constructor - the map can change while the editor is open.
-    if (const auto map = processor.getNoteMap(); map != displayedNoteMap)
-    {
-        displayedNoteMap = map;
-        noteLabel = juce::MidiMessage::getMidiNoteName (primaryNoteForTrack (trackIndex, map), true, true, 3)
-                      + "  " + juce::String (primaryNoteForTrack (trackIndex, map));
-        repaint();
-    }
+    header.updateFromProcessor();
 
     for (auto* knob : { decayKnob.get(), toneKnob.get(), characterKnob.get(), sweepKnob.get(),
                         tuneKnob.get(), levelKnob.get(), panKnob.get(), driveKnob.get(), sendKnob.get() })
         knob->refreshFromProcessor();
 
-    const uint32_t triggerCount = processor.getTrackTriggerCount (trackIndex);
-
-    if (triggerCount != lastTriggerCount)
-    {
-        lastTriggerCount = triggerCount;
-        pad.addGlow (1.0f);
-    }
-
-    if (pad.getGlow() > 0.002f)
-    {
-        pad.decayGlow (0.80f);
-        pad.repaint();
-    }
 
     const float peak = processor.readTrackPeak (trackIndex);
     const float newPeak = juce::jmax (peak, displayedPeak * 0.80f);
@@ -313,11 +200,10 @@ void TrackStrip::resized()
     auto area = getLocalBounds().reduced (6, 5);
 
     // Identity block: track number, engine name, note. Fixed width so every row lines up.
-    identityArea = area.removeFromLeft (juce::jmin (100, area.getWidth() / 8));
-
-    // Pad: square, as tall as the row allows.
-    const int padSize = juce::jmin (area.getWidth(), area.getHeight());
-    padArea = area.removeFromLeft (padSize).reduced (3, 0);
+    // Identity and pad together, so every page shows the same block in the same place.
+    const int headerWidth = TrackHeader::identityWidth
+                              + juce::jmin (area.getHeight(), area.getWidth() / 4);
+    headerArea = area.removeFromLeft (headerWidth);
     area.removeFromLeft (6);
 
     // Engine and distortion, stacked in one column.
@@ -357,7 +243,7 @@ void TrackStrip::resized()
 
     modelBox.setBounds (comboArea);
     distBox.setBounds (distArea);
-    pad.setBounds (padArea);
+    header.setBounds (headerArea);
 }
 
 void TrackStrip::paint (juce::Graphics& g)
@@ -374,26 +260,6 @@ void TrackStrip::paint (juce::Graphics& g)
 
     const int model = juce::jlimit (0, kNumModels - 1, displayedModel);
     const auto& info = getModelInfo (model);
-
-    // ---- Identity ------------------------------------------------------------
-    {
-        auto identity = identityArea;
-
-        g.setColour (juce::Colour (info.colour));
-        g.setFont (theme::font (13.0f, juce::Font::bold));
-        g.drawText (juce::String (trackIndex + 1), identity.removeFromTop (17),
-                    juce::Justification::centredLeft, false);
-
-        g.setColour (theme::text);
-        g.setFont (theme::font (10.0f, juce::Font::bold));
-        g.drawText (juce::String (info.name).toUpperCase(), identity.removeFromTop (13),
-                    juce::Justification::centredLeft, false);
-
-        g.setColour (theme::textDim);
-        g.setFont (theme::font (9.0f));
-        g.drawText (noteLabel, identity.removeFromTop (12),
-                    juce::Justification::centredLeft, false);
-    }
 
     // ---- Level meter ---------------------------------------------------------
     if (! meterArea.isEmpty())

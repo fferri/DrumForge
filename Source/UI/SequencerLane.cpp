@@ -76,8 +76,9 @@ void ValueStepper::paint (juce::Graphics& g)
 
 //==============================================================================
 SequencerLaneComponent::SequencerLaneComponent (DrumKitProcessor& owner, int index)
-    : processor (owner), trackIndex (index)
+    : processor (owner), trackIndex (index), header (owner, index)
 {
+    addAndMakeVisible (header);
     modeBox.setTooltip ("How the pattern is built: an explicit grid, or pulses spread "
                         "evenly across the steps.");
     speedBox.setTooltip ("How fast. A step is a 1/16 note divided by this, so a bigger "
@@ -133,6 +134,7 @@ const TriggerLane& SequencerLaneComponent::lane() const noexcept
 
 void SequencerLaneComponent::refreshFromProcessor()
 {
+    header.updateFromProcessor();
     syncControls();
     repaint();
 }
@@ -181,22 +183,24 @@ void SequencerLaneComponent::resized()
 {
     auto area = getLocalBounds().reduced (8, 5);
 
-    identityArea = area.removeFromLeft (84);
-    area.removeFromLeft (6);
+    // The same header every page uses, so a track's identity never moves.
+    headerArea = area.removeFromLeft (TrackHeader::identityWidth
+                                        + juce::jmin (area.getHeight(), area.getWidth() / 5));
+    header.setBounds (headerArea);
+    area.removeFromLeft (8);
 
-    enabledButton.setBounds (identityArea.removeFromBottom (17).reduced (0, 1));
-
-    // The three selectors stack, which is what leaves the row wide enough for the steps.
     controlsArea = area.removeFromLeft (118);
     {
         auto stack = controlsArea;
-        const int cellHeight = juce::jmin (20, (stack.getHeight() - 4) / 3);
+        const int cellHeight = juce::jmin (19, (stack.getHeight() - 6) / 4);
 
         modeBox.setBounds (stack.removeFromTop (cellHeight));
         stack.removeFromTop (2);
         speedBox.setBounds (stack.removeFromTop (cellHeight));
         stack.removeFromTop (2);
         lengthStepper.setBounds (stack.removeFromTop (cellHeight));
+        stack.removeFromTop (2);
+        enabledButton.setBounds (stack.removeFromTop (cellHeight));
     }
 
     area.removeFromLeft (10);
@@ -306,23 +310,6 @@ void SequencerLaneComponent::paint (juce::Graphics& g)
     g.setColour (theme::outline);
     g.drawRoundedRectangle (bounds, 5.0f, 1.0f);
 
-    const int model = processor.getSelectedModel (trackIndex);
-    const auto& info = getModelInfo (juce::jlimit (0, kNumModels - 1, model));
-
-    {
-        auto identity = identityArea;
-
-        g.setColour (juce::Colour (info.colour));
-        g.setFont (theme::font (13.0f, juce::Font::bold));
-        g.drawText (juce::String (trackIndex + 1), identity.removeFromTop (17),
-                    juce::Justification::centredLeft, false);
-
-        g.setColour (theme::text);
-        g.setFont (theme::font (10.0f, juce::Font::bold));
-        g.drawText (juce::String (info.name).toUpperCase(), identity.removeFromTop (13),
-                    juce::Justification::centredLeft, false);
-    }
-
     if (editorBounds.isEmpty())
         return;
 
@@ -395,8 +382,9 @@ void SequencerLaneComponent::paint (juce::Graphics& g)
 
 //==============================================================================
 AutomationLaneComponent::AutomationLaneComponent (DrumKitProcessor& owner, int index)
-    : processor (owner), trackIndex (index)
+    : processor (owner), trackIndex (index), header (owner, index)
 {
+    addAndMakeVisible (header);
     speedBox.setTooltip ("How fast the envelope runs.");
     lengthStepper.setBoundsTo (getLocalBounds());
     lengthStepper.setTooltip ("How many steps the envelope spans before it loops. Its own "
@@ -465,6 +453,7 @@ int AutomationLaneComponent::tabIndexAt (juce::Point<int> position) const noexce
 
 void AutomationLaneComponent::refreshFromProcessor()
 {
+    header.updateFromProcessor();
     syncControls();
     repaint();
 }
@@ -504,19 +493,21 @@ void AutomationLaneComponent::resized()
     tabArea = area.removeFromTop (16);
     area.removeFromTop (2);
 
-    identityArea = area.removeFromLeft (84);
-    area.removeFromLeft (6);
-
-    enabledButton.setBounds (identityArea.removeFromBottom (17).reduced (0, 1));
+    headerArea = area.removeFromLeft (TrackHeader::identityWidth
+                                        + juce::jmin (area.getHeight(), area.getWidth() / 5));
+    header.setBounds (headerArea);
+    area.removeFromLeft (8);
 
     controlsArea = area.removeFromLeft (118);
     {
         auto stack = controlsArea;
-        const int cellHeight = juce::jmin (20, (stack.getHeight() - 4) / 2);
+        const int cellHeight = juce::jmin (19, (stack.getHeight() - 4) / 3);
 
         speedBox.setBounds (stack.removeFromTop (cellHeight));
         stack.removeFromTop (2);
         lengthStepper.setBounds (stack.removeFromTop (cellHeight));
+        stack.removeFromTop (2);
+        enabledButton.setBounds (stack.removeFromTop (cellHeight));
     }
 
     area.removeFromLeft (10);
@@ -660,9 +651,9 @@ void AutomationLaneComponent::paint (juce::Graphics& g)
     // what is being automated, not just what you are looking at.
     for (int i = 0; i < kMaxAutomationLanes; ++i)
     {
-        const auto bounds = tabBounds (i);
+        const auto tab = tabBounds (i);
 
-        if (bounds.isEmpty())
+        if (tab.isEmpty())
             continue;
 
         const bool selected = i == slot;
@@ -670,34 +661,17 @@ void AutomationLaneComponent::paint (juce::Graphics& g)
 
         g.setColour (active ? (selected ? theme::accent : theme::accent.withAlpha (0.5f))
                             : theme::panelAlt);
-        g.fillRoundedRectangle (bounds.toFloat(), 2.0f);
+        g.fillRoundedRectangle (tab.toFloat(), 2.0f);
 
         if (selected)
         {
             g.setColour (theme::text);
-            g.drawRoundedRectangle (bounds.toFloat().reduced (0.5f), 2.0f, 1.4f);
+            g.drawRoundedRectangle (tab.toFloat().reduced (0.5f), 2.0f, 1.4f);
         }
 
         g.setColour (active ? (selected ? theme::background : theme::text) : theme::textDim);
         g.setFont (theme::font (9.0f, selected ? juce::Font::bold : juce::Font::plain));
-        g.drawText (modTargetName (i), bounds, juce::Justification::centred, false);
-    }
-
-    const int model = processor.getSelectedModel (trackIndex);
-    const auto& info = getModelInfo (juce::jlimit (0, kNumModels - 1, model));
-
-    {
-        auto identity = identityArea;
-
-        g.setColour (juce::Colour (info.colour));
-        g.setFont (theme::font (13.0f, juce::Font::bold));
-        g.drawText (juce::String (trackIndex + 1), identity.removeFromTop (17),
-                    juce::Justification::centredLeft, false);
-
-        g.setColour (theme::text);
-        g.setFont (theme::font (10.0f, juce::Font::bold));
-        g.drawText (juce::String (info.name).toUpperCase(), identity.removeFromTop (13),
-                    juce::Justification::centredLeft, false);
+        g.drawText (modTargetName (i), tab, juce::Justification::centred, false);
     }
 
     if (editorBounds.isEmpty())

@@ -30,6 +30,7 @@ add_library(DrumForgeCore STATIC
     Source/UI/VelocityKnob.cpp
     Source/UI/TrackStrip.cpp
     Source/UI/DrumKitEditor.cpp
+    Source/UI/TrackHeader.cpp
     Source/UI/SequencerLane.cpp)
 
 target_include_directories(DrumForgeCore PUBLIC Source)

@@ -7,6 +7,7 @@
 
 #include "../Core/DrumKitProcessor.h"
 #include "Theme.h"
+#include "TrackHeader.h"
 
 namespace df
 {
@@ -80,7 +81,8 @@ private:
     ValueStepper trigsStepper { "Trigs", 0, kMaxLaneSteps };
     ValueStepper offsetStepper { "Offset", -kMaxLaneSteps, kMaxLaneSteps };
 
-    juce::Rectangle<int> identityArea, controlsArea, euclideanArea, editorBounds;
+    TrackHeader header;
+    juce::Rectangle<int> headerArea, controlsArea, euclideanArea, editorBounds;
 
     /** The step being clicked, so a click can toggle and a vertical drag can set velocity
         without the two fighting each other. */
@@ -136,7 +138,8 @@ private:
     ValueStepper lengthStepper { "Steps", 1, kMaxLaneSteps };
     juce::Slider amountSlider;
 
-    juce::Rectangle<int> tabArea, identityArea, controlsArea, editorBounds;
+    TrackHeader header;
+    juce::Rectangle<int> tabArea, headerArea, controlsArea, editorBounds;
 
     int draggedPoint = -1;
 

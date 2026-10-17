@@ -69,6 +69,10 @@ If you would rather build it yourself, see [AGENTS.md](AGENTS.md#building).
 
 ### The window
 
+Every page that lists tracks puts the same block at the left of each row: the track number,
+its engine, its MIDI note, and the pad you can click to play it. Changing page does not move
+it, so you always know which row you are looking at.
+
 A bar across the top holds the wordmark, the name of the kit currently loaded, and the menu
 button at the far right.
 
