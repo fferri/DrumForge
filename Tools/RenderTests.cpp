@@ -2069,6 +2069,51 @@ void testSequencerPersistence()
     }
 }
 
+void testKitLoadLeavesControlsFree()
+{
+    section ("Kits: loading one must not lock the controls");
+
+    setSettingsDirectoryOverride (juce::File::getSpecialLocation (juce::File::tempDirectory)
+                                      .getChildFile ("DrumForgeKitLockTests"));
+
+    DrumKitProcessor processor;
+    DrumKitEditor editor (processor);
+
+    // Stands in for the host restoring a kit, or the user picking one from the menu: the kit
+    // parameter changes, and the editor's timer picks it up and loads the preset.
+    processor.applyKitPreset (3);
+    editor.refreshFromProcessor();
+
+    const auto tuneID = pid::track (0, pid::tune);
+    const float dialled = 7.0f;
+
+    setParameterValue (processor.apvts, tuneID, dialled);
+
+    // The editor's timer runs at 30 Hz. If loading a kit left the polled parameter out of
+    // step with what the kit set, every one of these ticks would re-apply the preset and
+    // throw the change away - which is exactly what the user saw.
+    for (int tick = 0; tick < 10; ++tick)
+        editor.refreshFromProcessor();
+
+    const float after = processor.apvts.getRawParameterValue (tuneID)->load();
+
+    check (std::abs (after - dialled) < 1.0e-3f,
+           "a knob moved after loading a kit stays where it was put",
+           juce::String (after) + " (wanted " + juce::String (dialled) + ")");
+
+    // The chosen engine must survive too, since loading a kit sets it.
+    const int model = 2;
+    if (auto* parameter = processor.apvts.getParameter (pid::track (0, pid::model)))
+        parameter->setValueNotifyingHost (parameter->convertTo0to1 ((float) model));
+
+    for (int tick = 0; tick < 10; ++tick)
+        editor.refreshFromProcessor();
+
+    check (processor.getSelectedModel (0) == model,
+           "and so does the machine selected after a kit load",
+           juce::String (processor.getSelectedModel (0)));
+}
+
 void testEditorNoteLabels()
 {
     section ("Editor: the header note follows the map");
@@ -2167,6 +2212,7 @@ int main()
     testSequencerCore();
     testSequencerAudio();
     testSequencerPersistence();
+    testKitLoadLeavesControlsFree();
     testEditorNoteLabels();
 
     std::cout << "\n============================\n"

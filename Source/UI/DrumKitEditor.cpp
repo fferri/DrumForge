@@ -37,9 +37,9 @@ DrumKitEditor::DrumKitEditor (DrumKitProcessor& owner)
 
     // ---- Kit name and the main menu -----------------------------------------
     kitLabel.setJustificationType (juce::Justification::centredLeft);
-    kitLabel.setColour (juce::Label::textColourId, theme::textDim);
     kitLabel.setFont (theme::font (12.0f));
-    kitLabel.setInterceptsMouseClicks (false, false);
+    kitLabel.setTooltip ("Click to change kit.");
+    kitLabel.onClick = [this] { showKitMenu(); };
     addAndMakeVisible (kitLabel);
 
     menuButton.setTooltip ("Kits, and the MIDI note map.");
@@ -282,11 +282,8 @@ void DrumKitEditor::paint (juce::Graphics& g)
 }
 
 //==============================================================================
-void DrumKitEditor::showMainMenu()
+juce::PopupMenu DrumKitEditor::buildKitMenu()
 {
-    juce::PopupMenu menu;
-
-    // ---- Kits ---------------------------------------------------------------
     juce::PopupMenu kits;
     const int userStart = numFactoryKits();
 
@@ -311,7 +308,20 @@ void DrumKitEditor::showMainMenu()
 
     kits.addItem (menuShowFolder, "Show kits folder");
 
-    menu.addSubMenu ("Kit", kits);
+    return kits;
+}
+
+void DrumKitEditor::showKitMenu()
+{
+    buildKitMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&kitLabel),
+                                  [this] (int result) { handleMainMenuResult (result); });
+}
+
+void DrumKitEditor::showMainMenu()
+{
+    juce::PopupMenu menu;
+
+    menu.addSubMenu ("Kit", buildKitMenu());
 
     // ---- Note map -----------------------------------------------------------
     juce::PopupMenu maps;
@@ -371,6 +381,12 @@ void DrumKitEditor::loadKit (int index)
     applyKit (kit(), library.getKit (index));
 
     currentKitIndex = index;
+
+    // Record what the kit parameter now reads. Without this the timer would compare it with
+    // the old value on every tick, decide the host had changed the kit, and re-apply it -
+    // which silently reverted every knob the user then touched.
+    lastSeenKitParameter = kit().getSelectedKit();
+
     refreshKitLabel();
 }
 

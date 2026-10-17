@@ -50,6 +50,10 @@ private:
     void timerCallback() override;
 
     void showMainMenu();
+    void showKitMenu();
+
+    /** The kit list and its file commands. Shared by the main menu and the kit name. */
+    juce::PopupMenu buildKitMenu();
     void handleMainMenuResult (int result);
 
     void loadKit (int index);
@@ -71,7 +75,7 @@ private:
 
     KitLibrary library;
 
-    juce::Label kitLabel;
+    KitNameButton kitLabel;
     MenuButton menuButton;
     std::array<juce::TextButton, 5> tabButtons;
 

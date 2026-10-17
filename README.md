@@ -218,8 +218,8 @@ Twenty-five kits ship with it:
 
 alongside three originals: **Industrial** (the default), **Warehouse** and **Studio**.
 
-Open the main menu — the button at the top right — and choose **Kit**. Built-in kits and
-your own appear in one list.
+**Click the kit name** in the top bar, or open the main menu at the top right and choose
+**Kit**. Both give the same list: built-in kits and your own in one place.
 
 **Built-in kits are read-only and are not copied to disk**, so a later version of DrumForge
 can improve them and you get the improvement automatically. Saving always makes a kit of

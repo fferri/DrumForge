@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include <juce_gui_basics/juce_gui_basics.h>
 
 namespace df::theme
@@ -63,6 +65,40 @@ public:
             g.fillRoundedRectangle (centre.x - width * 0.5f,
                                     centre.y + (float) i * spacing - thickness * 0.5f,
                                     width, thickness, thickness * 0.5f);
+    }
+};
+
+/** The kit name in the top bar.
+
+    A label rather than a button, so it reads as the instrument's current state rather than
+    as a control - but clicking it opens the kit menu, because the name of the thing you want
+    to change is the most obvious place to click.
+*/
+class KitNameButton final : public juce::Label
+{
+public:
+    KitNameButton()
+    {
+        setInterceptsMouseClicks (true, false);
+        setColour (juce::Label::textColourId, theme::textDim);
+    }
+
+    std::function<void()> onClick;
+
+    void mouseEnter (const juce::MouseEvent&) override
+    {
+        setColour (juce::Label::textColourId, theme::text);
+    }
+
+    void mouseExit (const juce::MouseEvent&) override
+    {
+        setColour (juce::Label::textColourId, theme::textDim);
+    }
+
+    void mouseUp (const juce::MouseEvent&) override
+    {
+        if (onClick != nullptr)
+            onClick();
     }
 };
 
